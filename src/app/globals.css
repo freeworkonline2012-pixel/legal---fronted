@@ -1,0 +1,229 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  توكينز التصميم — متغيرات CSS.
+  المصدر الوحيد للقيم: docs/design/ui/design_tokens.json (قسم semantic_light / semantic_dark).
+  لا تُعدّل hex يدوياً هنا.
+*/
+
+:root {
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f6fa;
+  --color-surface-inset: #e8edf4;
+  --color-border-default: #d5dce6;
+  --color-border-strong: #8a9099;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #525252;
+  --color-text-tertiary: #6b7078;
+  --color-text-on-primary: #ffffff;
+  --color-primary: #14539a;
+  --color-primary-hover: #0f3a6e;
+  --color-primary-active: #0c2d52;
+  --color-primary-soft: #eff5fc;
+  --color-primary-border: #2e7fd6;
+  --color-secondary: #0f3a6e;
+  --color-success: #1e7a3c;
+  --color-success-soft: #dcf3e4;
+  --color-warning: #8a6d00;
+  --color-warning-soft: #f7efd0;
+  --color-error: #b3261e;
+  --color-error-soft: #fbe3e1;
+  --color-info: #14539a;
+  --color-disabled-bg: #e8edf4;
+  --color-disabled-text: #8a9099;
+  --color-link: #14539a;
+  --color-link-visited: #0f3a6e;
+  --color-overlay: rgba(12, 45, 82, 0.45);
+  /* حلقة التركيز — تُستخدم في القاعدة العامة و في الحقول (design_tokens shadow.focus-ring-light) */
+  --color-focus-ring: rgba(20, 83, 154, 0.28);
+
+  --font-ui: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', 'Tahoma', sans-serif;
+  --font-legal: 'Noto Naskh Arabic', 'Amiri', 'Serif', serif;
+}
+
+.dark {
+  --color-background: #0f1720;
+  --color-surface: #17222e;
+  --color-surface-muted: #1f2c3a;
+  --color-surface-inset: #243243;
+  --color-border-default: #2e3e50;
+  --color-border-strong: #4a5a70;
+  --color-text-primary: #e8edf4;
+  --color-text-secondary: #c3ccd9;
+  --color-text-tertiary: #9aa7b8;
+  --color-text-on-primary: #0c2d52;
+  --color-primary: #7fb3e8;
+  --color-primary-hover: #9cc6f0;
+  --color-primary-active: #5e9bd4;
+  --color-primary-soft: #1f2c3a;
+  --color-primary-border: #5e9bd4;
+  --color-secondary: #9cc6f0;
+  --color-success: #4cc38a;
+  --color-success-soft: #1c3a2b;
+  --color-warning: #d4a84f;
+  --color-warning-soft: #3a3217;
+  --color-error: #f08a84;
+  --color-error-soft: #3e2220;
+  --color-info: #7fb3e8;
+  --color-disabled-bg: #243243;
+  --color-disabled-text: #6b7686;
+  --color-link: #9cc6f0;
+  --color-link-visited: #c3ccd9;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  /* حلقة التركيز الليلية (design_tokens shadow.focus-ring-dark) */
+  --color-focus-ring: rgba(127, 179, 232, 0.35);
+}
+
+@layer base {
+  html {
+    direction: rtl;
+    font-family: var(--font-ui);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* حلقة تركيز إلزامية لكل عنصر تفاعلي (WCAG 2.1 AA) — اللون يتغير مع الوضع الليلي عبر
+     --color-focus-ring (يُعرَّف في :root و .dark — design_tokens shadow.focus-ring-*) */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  .dark :focus-visible {
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+
+  /* إيقاف الحركة بالكامل عند تفضيل تقليل الحركة (design_system.md القسم 6) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* النص الحرفي للمادة القانونية — خط legal فقط (قاعدة: خطّان في النظام كله) */
+  .legal-text {
+    font-family: var(--font-legal);
+    font-size: 17px;
+    line-height: 1.9;
+  }
+}
+
+@layer utilities {
+  /* تدرج Skeleton (component_states.md القسم 13) — يستخدم متغيرات CSS الدلالية
+     فتتغير تلقائياً مع الوضع الليلي دون تكرار hex يدوياً، ويتوقف عند reduced-motion */
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-inset) 25%,
+      var(--color-surface-muted) 50%,
+      var(--color-surface-inset) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.2s ease-in-out infinite;
+  }
+
+  /* نبض بطيء لخطوة التقدم النشطة (1.6s — design_tokens motion) */
+  .animate-step-pulse {
+    animation: step-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes step-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* إيقاف كل الحركات عند تفضيل تقليل الحركة (مُغطّى أيضاً في @layer base) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-step-pulse {
+    animation: none !important;
+  }
+}
+
+/*
+  إضافات بصرية — جولة الترقية الاحترافية (2026-08-26).
+  كل قيمة هنا مبنية على توكينز موجودة فعلاً في design_tokens (primary-soft،
+  shadow.xl، motion.base) — لا hex جديد، ولا انحراف عن مصدر التصميم الموحّد.
+*/
+
+/* خلفية الهيدر: شفافية + ضبابية خفيفة عند التمرير خلفه، مع سقوط آمن (graceful
+   degradation) للمتصفحات التي لا تدعم color-mix — يبقى الخط الأول (اللون
+   الصلب) سارياً فيها تلقائياً دون أي كسر بصري. */
+.header-surface {
+  background-color: var(--color-surface);
+  background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* توهّج خفيف أعلى قسم الـHero — يستخدم primary-soft فقط (موجود في :root وdark
+   بالفعل) فيتبدّل تلقائياً مع الوضع الليلي بلا أي كود إضافي. */
+.hero-glow {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-glow::before {
+  content: '';
+  position: absolute;
+  inset: -8% -10% auto -10%;
+  height: 420px;
+  background: radial-gradient(55% 60% at 50% 0%, var(--color-primary-soft) 0%, transparent 72%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ارتفاع بصري خفيف للبطاقات عند hover — نفس قيمة shadow.xl من design_tokens
+   (rgba(12,45,82,0.16)) ونفس مدة/منحنى motion.base — بلا أي قيمة جديدة. */
+.card-elevate {
+  transition:
+    transform 200ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.card-elevate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(12, 45, 82, 0.16);
+  border-color: var(--color-primary-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-elevate {
+    transition: none;
+  }
+
+  .card-elevate:hover {
+    transform: none;
+  }
+}
