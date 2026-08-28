@@ -22,6 +22,7 @@ export const DOMAIN_KEYS: readonly DomainKey[] = [
   'consumer_protection',
   'insurance',
   'aml_cft',
+  'legal_profession',
   'other',
 ];
 

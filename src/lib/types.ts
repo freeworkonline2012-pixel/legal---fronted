@@ -35,6 +35,7 @@ export type DomainKey =
   | 'consumer_protection'
   | 'insurance'
   | 'aml_cft'
+  | 'legal_profession'
   | 'other';
 
 /** درجة ثقة رقمية بين 0 و 1 (PRD F-06) */

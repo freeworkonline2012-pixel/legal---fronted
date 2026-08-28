@@ -7,18 +7,16 @@
  * (سكربت scripts/sync_frontend_tokens.mjs يتحقق أن كل hex مستخدم هنا موجود في ملف JSON المصدر)
  */
 
+import type { DomainKey } from './types';
+
 export type LegalStatusKey = 'active' | 'amended' | 'repealed';
 export type ConfidenceKey = 'high' | 'medium' | 'low';
-/** مطابقة حرفية لـ DOMAIN_KEYS فى backend — راجع تعليق DomainKey فى types.ts */
-export type DomainKey =
-  | 'labor'
-  | 'rent'
-  | 'personal_status'
-  | 'traffic'
-  | 'consumer_protection'
-  | 'insurance'
-  | 'aml_cft'
-  | 'other';
+// DomainKey يُستورَد الآن من types.ts بدل إعادة تعريفه هنا — كان هذا الملف
+// يحمل نسخة مكرَّرة يدوية (علّق عليها بـ"مطابقة حرفية" فقط، بلا فرض نوعى فعلى)
+// أُبقيت متزامنة بالصدفة مع insurance/aml_cft، لكنها نفس فجوة النوع (type
+// safety gap) المُوثَّقة فى domain-key.ts بالباك إند — إصلاح جذرى: مصدر واحد
+// للحقيقة عبر import بدل نسخة ثانية يمكن أن تُنسى فى أى إضافة قادمة.
+export type { DomainKey };
 
 export interface ColorToken {
   fg: string;
@@ -184,6 +182,7 @@ export const domainChipTokens: Record<
   consumer_protection: { label: 'حماية المستهلك', icon: 'receipt', light_fg: '#6B7078', light_bg: '#E8EDF4' },
   insurance: { label: 'التأمين والرقابة المالية', icon: 'shield-check', light_fg: '#14539A', light_bg: '#EFF5FC' },
   aml_cft: { label: 'مكافحة غسل الأموال', icon: 'shield-alert', light_fg: '#0C2D52', light_bg: '#E8EDF4' },
+  legal_profession: { label: 'مهنة المحاماة', icon: 'scale', light_fg: '#5B3A8E', light_bg: '#F1EAFB' },
   other: { label: 'أخرى', icon: 'file-text', light_fg: '#525252', light_bg: '#F4F6FA' },
 };
 
