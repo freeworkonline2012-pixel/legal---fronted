@@ -183,6 +183,8 @@ export const domainChipTokens: Record<
   insurance: { label: 'التأمين والرقابة المالية', icon: 'shield-check', light_fg: '#14539A', light_bg: '#EFF5FC' },
   aml_cft: { label: 'مكافحة غسل الأموال', icon: 'shield-alert', light_fg: '#0C2D52', light_bg: '#E8EDF4' },
   legal_profession: { label: 'مهنة المحاماة', icon: 'scale', light_fg: '#5B3A8E', light_bg: '#F1EAFB' },
+  capital_markets: { label: 'سوق المال', icon: 'trending-up', light_fg: '#0E7C7B', light_bg: '#E1F3F2' },
+  non_bank_finance: { label: 'التمويل غير المصرفى', icon: 'landmark', light_fg: '#B85C00', light_bg: '#FDEEDC' },
   other: { label: 'أخرى', icon: 'file-text', light_fg: '#525252', light_bg: '#F4F6FA' },
 };
 
