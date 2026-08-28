@@ -8,7 +8,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { Briefcase, Car, FileText, Home, Landmark, Receipt, Scale, ShieldAlert, Users } from 'lucide-react';
+import { Briefcase, Car, FileText, Home, Landmark, Receipt, Scale, ShieldAlert, TrendingUp, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { DomainKey } from '@/lib/types';
 import { domainChipTokens } from '@/lib/tokens';
@@ -22,6 +22,8 @@ export const DOMAIN_ICONS: Record<DomainKey, LucideIcon> = {
   insurance: Landmark,
   aml_cft: ShieldAlert,
   legal_profession: Scale,
+  capital_markets: TrendingUp,
+  non_bank_finance: Landmark,
   other: FileText,
 };
 
