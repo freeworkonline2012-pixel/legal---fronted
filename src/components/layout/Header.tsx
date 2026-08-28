@@ -71,6 +71,10 @@ export function Header({ showAuth = false }: HeaderProps) {
         </Link>
 
         <nav aria-label="التنقل الرئيسي" className="flex items-center gap-1 sm:gap-2">
+          {/* ترتيب القائمة (حُدِّث 2026-08-28): الأسئلة - اشترك - القوانين -
+              القرارات - اللوائح التنفيذية - الأدلة الإرشادية. «اشترك» رابط
+              تسويقى مباشر لصفحة /pricing (غير مرتبط بحالة تسجيل الدخول عمداً
+              — بخلاف زرّى تسجيل الدخول/جرّب مجاناً أدناه المقيّدين بـshowAuth). */}
           <Link
             href="/chat"
             className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
@@ -78,10 +82,28 @@ export function Header({ showAuth = false }: HeaderProps) {
             الأسئلة
           </Link>
           <Link
+            href="/pricing"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            اشترك
+          </Link>
+          <Link
             href="/laws"
             className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
           >
             القوانين
+          </Link>
+          <Link
+            href="/decisions"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            القرارات
+          </Link>
+          <Link
+            href="/regulations"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            اللوائح التنفيذية
           </Link>
           <Link
             href="/guidance"
@@ -91,7 +113,9 @@ export function Header({ showAuth = false }: HeaderProps) {
           </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم
-              تُحذف وتبقى تعمل عبر الرابط المباشر — أُزيلت من التنقل الرئيسى فقط. */}
+              تُحذف وتبقى تعمل عبر الرابط المباشر — أُزيلت من التنقل الرئيسى فقط.
+              (أُعيد تأكيد هذا القرار صراحة 2026-08-28 عند إعادة تصميم القائمة —
+              راجع تقرير الجلسة لتفاصيل القرار.) */}
           <ThemeToggle />
           {showAuth ? (
             authed ? (

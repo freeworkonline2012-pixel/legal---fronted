@@ -222,6 +222,13 @@ export interface LawItem {
   short_title: string | null;
   /** نص حر من backend (قد يقع خارج DomainKey فى حالات نادرة) — استخدم isDomainKey للعرض الآمن */
   category: string;
+  /**
+   * نوع الأداة التشريعية (law/pm_decision/ministerial_decision/board_decision/
+   * circular/regulation/other) — يطابق law-kind.ts (T-VOCAB-2) فى backend،
+   * أُضيف 2026-08-28 لدعم صفحتى /decisions و/regulations. نص حر هنا عمداً
+   * (بلا union مضبوط) لنفس سبب category أعلاه.
+   */
+  kind: string;
   /** ISO 3166-1 alpha-2 — راجع CountryItem */
   country_code: string;
   status: LawStatusKey;

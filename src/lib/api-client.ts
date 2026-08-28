@@ -186,11 +186,13 @@ export async function resolveReview(
 /* تصفح القوانين والأدلة الإرشادية (أُضيف 2026-08-27) — قراءة عامة، بلا مصادقة */
 /* ------------------------------------------------------------------------ */
 
-/** GET /api/laws — تصفح القوانين مع فلترة اختيارية بالمجال/الدولة/الحالة وترقيم صفحات */
+/** GET /api/laws — تصفح القوانين مع فلترة اختيارية بالمجال/الدولة/الحالة/النوع وترقيم صفحات */
 export async function fetchLaws(params?: {
   category?: DomainKey;
   country?: string;
   status?: LawStatusKey;
+  /** نوع الأداة التشريعية — قيمة واحدة أو عدة قيم مفصولة بفاصلة (راجع law-kind.ts) */
+  kind?: string;
   limit?: number;
   offset?: number;
 }): Promise<LawListResponse> {
@@ -198,6 +200,7 @@ export async function fetchLaws(params?: {
   if (params?.category) query.set('category', params.category);
   if (params?.country) query.set('country', params.country);
   if (params?.status) query.set('status', params.status);
+  if (params?.kind) query.set('kind', params.kind);
   query.set('limit', String(params?.limit ?? 100));
   query.set('offset', String(params?.offset ?? 0));
   return requestJson<LawListResponse>(`/laws?${query.toString()}`);

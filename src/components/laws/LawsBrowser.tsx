@@ -1,13 +1,16 @@
 'use client';
 
 /**
- * مكوّن LawsBrowser — تصفح القوانين والقرارات (/laws).
+ * مكوّن LawsBrowser — تصفح القوانين/القرارات/اللوائح التنفيذية (/laws،
+ * /decisions، /regulations على التوالى — راجع kindFilter أدناه).
  *
  * ملاحظة تصميمية مهمة: عقد backend الفعلى (GET /api/laws) لا يوفّر بحثاً نصياً
- * حراً — فقط فلترة بالمجال/الحالة وترقيم صفحات. بما أن إجمالى عدد القوانين
+ * حراً — فقط فلترة بالمجال/الحالة/النوع وترقيم صفحات. بما أن إجمالى عدد القوانين
  * محدود حالياً (~127)، نجلبها كاملة عبر ترقيم صفحات داخلى (حتى limit=100 لكل
- * طلب حسب حد backend) ثم نطبّق البحث النصى والفلترة على العميل — حل صادق
- * ومناسب لهذا الحجم، وليس بديلاً وهمياً عن بحث خادم حقيقى لو تضخّم العدد لاحقاً.
+ * طلب حسب حد backend) ثم نطبّق البحث النصى والفلترة (بما فيها kindFilter) على
+ * العميل — حل صادق ومناسب لهذا الحجم، وليس بديلاً وهمياً عن بحث خادم حقيقى لو
+ * تضخّم العدد لاحقاً (عندها فلترة kind تنتقل لطلب الخادم — الدعم موجود بالفعل
+ * فى fetchLaws({kind}) منذ 2026-08-28).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -35,9 +38,30 @@ export interface LawsBrowserProps {
   initialCategory?: string;
   /** دولة مبدئية من رابط عميق (؟country=) — قادم عادةً من "القائمة الرئيسية" */
   initialCountry?: string;
+  /**
+   * قصر العرض على أنواع أداة تشريعية محدَّدة (law-kind.ts) — تُستخدم لتقسيم
+   * /api/laws الواحد إلى ثلاث صفحات مستقلة فى الواجهة: /laws (['law'])،
+   * /decisions (DECISION_KINDS)، /regulations (['regulation']). حين تُمرَّر،
+   * تُطبَّق قبل أى فلترة أخرى (بحث/مجال/دولة/حالة) وتُستخدم كمقام لعدّاد
+   * النتائج بدل إجمالى المنصة كله.
+   */
+  kindFilter?: readonly string[];
+  /** الاسم النحوى المفرد للعنصر فى نص العدّاد ("قانوناً"/"قراراً"/"لائحة") */
+  itemNoun?: string;
+  /** عنوان الحالة الفارغة الحقيقية (لا يوجد محتوى إطلاقاً بهذا النوع بعد — قبل أى بحث) */
+  emptyKindTitle?: string;
+  /** وصف الحالة الفارغة الحقيقية */
+  emptyKindDescription?: string;
 }
 
-export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProps) {
+export function LawsBrowser({
+  initialCategory,
+  initialCountry,
+  kindFilter,
+  itemNoun = 'قانوناً وقراراً',
+  emptyKindTitle,
+  emptyKindDescription,
+}: LawsBrowserProps) {
   const [laws, setLaws] = useState<LawItem[]>([]);
   const [countries, setCountries] = useState<CountryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,9 +118,17 @@ export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProp
     };
   }, []);
 
+  // نطاق هذه الصفحة (بعد kindFilter، قبل أى فلترة تفاعلية من المستخدم) — هو
+  // المقام الصحيح لعدّاد النتائج ولتحديد الحالة الفارغة "الحقيقية" (لا محتوى
+  // من هذا النوع أصلاً) من حالة "بحث بلا نتائج".
+  const scoped = useMemo(
+    () => (kindFilter ? laws.filter((law) => kindFilter.includes(law.kind)) : laws),
+    [laws, kindFilter],
+  );
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return laws.filter((law) => {
+    return scoped.filter((law) => {
       if (category !== 'all' && law.category !== category) return false;
       if (country !== 'all' && law.country_code !== country) return false;
       if (status !== 'all' && law.status !== status) return false;
@@ -106,7 +138,7 @@ export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProp
       }
       return true;
     });
-  }, [laws, category, country, status, search]);
+  }, [scoped, category, country, status, search]);
 
   return (
     <div className="space-y-6">
@@ -200,6 +232,14 @@ export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProp
             إعادة المحاولة
           </Button>
         </div>
+      ) : scoped.length === 0 ? (
+        // حالة فارغة حقيقية: لا يوجد أى محتوى من هذا النوع على المنصة بعد —
+        // مختلفة عمداً عن "بحث بلا نتائج" أدناه (لا تلمّح بأن البحث هو السبب).
+        <EmptyState
+          icon={<FileSearch className="h-12 w-12" aria-hidden="true" />}
+          title={emptyKindTitle ?? 'لا يوجد محتوى من هذا النوع بعد'}
+          description={emptyKindDescription ?? 'سيظهر هنا فور إدخاله على المنصة.'}
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<FileSearch className="h-12 w-12" aria-hidden="true" />}
@@ -209,7 +249,7 @@ export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProp
       ) : (
         <>
           <p className="text-body-sm text-text-tertiary">
-            {filtered.length} من إجمالى {laws.length} قانوناً وقراراً
+            {filtered.length} من إجمالى {scoped.length} {itemNoun}
           </p>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((law) => (
