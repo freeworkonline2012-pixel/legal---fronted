@@ -9,6 +9,11 @@ jest.mock('@/lib/api-client', () => ({
   postQuestion: jest.fn(),
   fetchQuestionHistory: jest.fn(),
   postFeedback: jest.fn(),
+  // MainSidebar (تُعرَض داخل ChatScreen) تستدعيهما عند التركيب — بلا هذا
+  // الـmock تفشل بـ "is not a function" رغم أن الاختبارات هنا لا تخص الشريط
+  // الجانبى. القيم الفارغة كافية: لا دول = لا شجرة تصفح، لا يؤثر على الاختبارات.
+  fetchCountries: jest.fn().mockResolvedValue({ items: [] }),
+  fetchLaws: jest.fn().mockResolvedValue({ items: [], total: 0 }),
 }));
 
 import { postQuestion } from '@/lib/api-client';

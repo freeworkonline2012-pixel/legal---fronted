@@ -10,6 +10,7 @@ import type {
   ArticleDetail,
   ArticleListResponse,
   AuthResponse,
+  CountryListResponse,
   DomainKey,
   FeedbackPayload,
   FeedbackResponse,
@@ -185,19 +186,29 @@ export async function resolveReview(
 /* تصفح القوانين والأدلة الإرشادية (أُضيف 2026-08-27) — قراءة عامة، بلا مصادقة */
 /* ------------------------------------------------------------------------ */
 
-/** GET /api/laws — تصفح القوانين مع فلترة اختيارية بالمجال/الحالة وترقيم صفحات */
+/** GET /api/laws — تصفح القوانين مع فلترة اختيارية بالمجال/الدولة/الحالة وترقيم صفحات */
 export async function fetchLaws(params?: {
   category?: DomainKey;
+  country?: string;
   status?: LawStatusKey;
   limit?: number;
   offset?: number;
 }): Promise<LawListResponse> {
   const query = new URLSearchParams();
   if (params?.category) query.set('category', params.category);
+  if (params?.country) query.set('country', params.country);
   if (params?.status) query.set('status', params.status);
   query.set('limit', String(params?.limit ?? 100));
   query.set('offset', String(params?.offset ?? 0));
   return requestJson<LawListResponse>(`/laws?${query.toString()}`);
+}
+
+/**
+ * GET /api/countries — الدول المستهدفة بالمنصة مع عدد القوانين الفعلى لكل
+ * دولة (يُستخدم لبناء "القائمة الرئيسية" فى الشريط الجانبى ولفلترة /laws).
+ */
+export async function fetchCountries(): Promise<CountryListResponse> {
+  return requestJson<CountryListResponse>('/countries');
 }
 
 /** GET /api/laws/{id} — تفاصيل قانون واحد */

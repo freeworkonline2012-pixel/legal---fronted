@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles, WifiOff } from 'lucide-react';
 import type { QuestionAnswerResponse } from '@/lib/types';
 import { postQuestion } from '@/lib/api-client';
-import { ChatSidebar } from '@/components/layout/ChatSidebar';
+import { MainSidebar } from '@/components/layout/MainSidebar';
 import { QuestionInput } from './QuestionInput';
 import { MessageBubble } from './MessageBubble';
 import { AnswerCard } from './AnswerCard';
@@ -170,7 +170,7 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
 
   return (
     <div className="flex min-h-[calc(100vh-64px)]">
-      <ChatSidebar
+      <MainSidebar
         conversations={conversations}
         activeConversationId={activeConversation}
         onSelect={(id) => setActiveConversation(id)}

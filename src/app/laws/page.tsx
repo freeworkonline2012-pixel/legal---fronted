@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export interface LawsPageProps {
   // Next.js 15+/16: searchParams فى App Router هو Promise فى مكوّنات الخادم
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; country?: string }>;
 }
 
 export default async function LawsPage({ searchParams }: LawsPageProps) {
@@ -26,7 +26,7 @@ export default async function LawsPage({ searchParams }: LawsPageProps) {
           نصوص رسمية موثّقة من مصادرها — ابحث أو صفّح حسب المجال وحالة النفاذ.
         </p>
         <div className="mt-6">
-          <LawsBrowser initialCategory={resolved.category} />
+          <LawsBrowser initialCategory={resolved.category} initialCountry={resolved.country} />
         </div>
       </main>
       <Footer />

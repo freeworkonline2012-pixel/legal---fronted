@@ -221,6 +221,8 @@ export interface LawItem {
   short_title: string | null;
   /** نص حر من backend (قد يقع خارج DomainKey فى حالات نادرة) — استخدم isDomainKey للعرض الآمن */
   category: string;
+  /** ISO 3166-1 alpha-2 — راجع CountryItem */
+  country_code: string;
   status: LawStatusKey;
   official_url: string | null;
   enacted_at: string | null;
@@ -233,6 +235,22 @@ export interface LawItem {
 export interface LawListResponse {
   items: LawItem[];
   total: number;
+}
+
+/** عنصر دولة — يطابق CountryResponseDto (GET /api/countries) */
+export interface CountryItem {
+  code: string;
+  name_ar: string;
+  name_en: string | null;
+  display_order: number;
+  is_active: boolean;
+  /** عدد القوانين الفعلى المُدخَل لهذه الدولة — 0 يعنى "قريباً" */
+  law_count: number;
+}
+
+/** رد GET /api/countries — {items} */
+export interface CountryListResponse {
+  items: CountryItem[];
 }
 
 /** نسخة مادة قانونية — تطابق ArticleVersionResponseDto */

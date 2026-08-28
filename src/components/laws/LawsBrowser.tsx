@@ -13,8 +13,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileSearch, Loader2, Search, WifiOff } from 'lucide-react';
-import type { LawItem, LawStatusKey } from '@/lib/types';
-import { fetchLaws, ApiError } from '@/lib/api-client';
+import type { CountryItem, LawItem, LawStatusKey } from '@/lib/types';
+import { fetchCountries, fetchLaws, ApiError } from '@/lib/api-client';
 import { DOMAIN_KEYS, isDomainKey } from '@/lib/normalize';
 import { domainChipTokens } from '@/lib/tokens';
 import { DomainChip } from '@/components/ui/DomainChip';
@@ -33,15 +33,19 @@ const MAX_FETCH_SAFETY_CAP = 1000;
 export interface LawsBrowserProps {
   /** فئة مبدئية من رابط عميق (؟category=) */
   initialCategory?: string;
+  /** دولة مبدئية من رابط عميق (؟country=) — قادم عادةً من "القائمة الرئيسية" */
+  initialCountry?: string;
 }
 
-export function LawsBrowser({ initialCategory }: LawsBrowserProps) {
+export function LawsBrowser({ initialCategory, initialCountry }: LawsBrowserProps) {
   const [laws, setLaws] = useState<LawItem[]>([]);
+  const [countries, setCountries] = useState<CountryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>(
     initialCategory && isDomainKey(initialCategory) ? initialCategory : 'all',
   );
+  const [country, setCountry] = useState<string>(initialCountry ?? 'all');
   const [status, setStatus] = useState<'all' | LawStatusKey>('all');
   const [search, setSearch] = useState('');
 
@@ -63,6 +67,14 @@ export function LawsBrowser({ initialCategory }: LawsBrowserProps) {
           if (page.items.length === 0) break; // حارس أمان — يمنع حلقة لا نهائية لو سلوك backend غير متوقع
         }
         if (!cancelled) setLaws(collected);
+        // فشل تحميل قائمة الدول لا يجب أن يمنع عرض القوانين نفسها — قائمة الدول
+        // فى الفلتر تفريعية فقط، لذا تُجلب بمعزل عن معالجة أخطاء القوانين أعلاه.
+        try {
+          const countriesRes = await fetchCountries();
+          if (!cancelled) setCountries(countriesRes.items);
+        } catch {
+          // تجاهل — الفلتر بالدولة يختفى فقط، لا كسر للصفحة كاملة
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -86,6 +98,7 @@ export function LawsBrowser({ initialCategory }: LawsBrowserProps) {
     const query = search.trim().toLowerCase();
     return laws.filter((law) => {
       if (category !== 'all' && law.category !== category) return false;
+      if (country !== 'all' && law.country_code !== country) return false;
       if (status !== 'all' && law.status !== status) return false;
       if (query) {
         const haystack = `${law.title} ${law.short_title ?? ''} ${law.law_no}`.toLowerCase();
@@ -93,7 +106,7 @@ export function LawsBrowser({ initialCategory }: LawsBrowserProps) {
       }
       return true;
     });
-  }, [laws, category, status, search]);
+  }, [laws, category, country, status, search]);
 
   return (
     <div className="space-y-6">
@@ -116,6 +129,27 @@ export function LawsBrowser({ initialCategory }: LawsBrowserProps) {
             className="h-11 w-full rounded-md border border-border-default bg-surface ps-9 pe-3 text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)]"
           />
         </div>
+
+        {countries.length > 0 ? (
+          <>
+            <label htmlFor="laws-country" className="sr-only">
+              الدولة
+            </label>
+            <select
+              id="laws-country"
+              value={country}
+              onChange={(event) => setCountry(event.target.value)}
+              className="h-11 rounded-md border border-border-default bg-surface px-3 text-body-sm text-text-primary focus:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)]"
+            >
+              <option value="all">كل الدول</option>
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name_ar}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
 
         <label htmlFor="laws-category" className="sr-only">
           المجال القانونى
