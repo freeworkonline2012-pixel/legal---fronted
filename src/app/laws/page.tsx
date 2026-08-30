@@ -24,15 +24,19 @@ export default async function LawsPage({ searchParams }: LawsPageProps) {
         <h1 className="text-h1 font-bold text-text-primary">القوانين</h1>
         <p className="mt-2 max-w-2xl text-body text-text-secondary">
           نصوص رسمية موثّقة من مصادرها — ابحث أو صفّح حسب المجال وحالة النفاذ.
-          {/* القرارات واللوائح التنفيذية انتقلتا لصفحتين مستقلتين (/decisions
-              و/regulations، أُضيفتا 2026-08-28) بعد أن كانتا مختلطتين هنا. */}
+          {/* القرارات واللوائح التنفيذية لهما صفحتان مستقلتان (/decisions
+              و/regulations، أُضيفتا 2026-08-28) عند التصفح العام بلا مجال محدَّد.
+              لكن عند الوصول بفئة محدَّدة (؟category=..، غالباً من الشريط
+              الجانبى الذى يَعُدّ كل الأنواع معاً تحت كل مجال) نعرض كل الأنواع
+              (قانون/قرار/لائحة) فى هذا المجال معاً، بلا قصر على kind=law —
+              حتى يطابق العدّاد المعروض فعلياً ما يظهر بعد الضغط عليه. */}
         </p>
         <div className="mt-6">
           <LawsBrowser
             initialCategory={resolved.category}
             initialCountry={resolved.country}
-            kindFilter={['law']}
-            itemNoun="قانوناً"
+            kindFilter={resolved.category ? undefined : ['law']}
+            itemNoun={resolved.category ? 'قانوناً وقراراً ولائحة' : 'قانوناً'}
           />
         </div>
       </main>
