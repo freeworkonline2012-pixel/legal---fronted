@@ -125,8 +125,9 @@ export function MainSidebar({
       className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-e border-border-default bg-surface-muted lg:flex"
     >
       <div className="px-4 pt-6">
+        {/* الوصف الفرعى "القوانين والقرارات حسب الدولة" أُزيل بطلب صريح
+            2026-09-05 — العنوان وحده كافٍ. */}
         <h2 className="text-h4 font-semibold text-text-primary">القائمة الرئيسية</h2>
-        <p className="mt-1 text-body-sm text-text-tertiary">القوانين والقرارات حسب الدولة</p>
       </div>
 
       {/* شجرة الدول */}
