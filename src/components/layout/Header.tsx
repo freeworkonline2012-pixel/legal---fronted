@@ -111,6 +111,18 @@ export function Header({ showAuth = false }: HeaderProps) {
           >
             الأدلة الإرشادية
           </Link>
+          {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة الحوكمة (Service 3) —
+              كانت API فقط بلا أى صفحة (Phase 3 مؤجَّلة). ⚠️ دقة الخدمة قيد
+              التحقق الفعلى وقت الإضافة (راجع تعليق GovernanceScreen) — الرابط
+              ظاهر عمداً بنفس شكل باقى القائمة (لا "تجريبي" فى نص الرابط نفسه)
+              لأن الصفحة نفسها تحمل تنبيهاً دائماً بارزاً غير قابل للطى، وهذا
+              أنسب مكان لذلك التحذير من ازدحام نص القائمة العلوية. */}
+          <Link
+            href="/governance"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            تحقق الالتزام
+          </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم
               تُحذف وتبقى تعمل عبر الرابط المباشر — أُزيلت من التنقل الرئيسى فقط.
