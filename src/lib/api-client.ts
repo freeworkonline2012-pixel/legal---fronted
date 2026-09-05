@@ -14,6 +14,8 @@ import type {
   DomainKey,
   FeedbackPayload,
   FeedbackResponse,
+  GovernanceAssessRequest,
+  GovernanceAssessResponse,
   GuidanceDetail,
   GuidanceListResponse,
   LawItem,
@@ -261,4 +263,23 @@ export async function fetchGuidanceList(params?: {
 /** GET /api/guidance/{id} — تفاصيل مستند إرشادى واحد (نص كامل) */
 export async function fetchGuidanceDetail(id: string): Promise<GuidanceDetail> {
   return requestJson<GuidanceDetail>(`/guidance/${encodeURIComponent(id)}`);
+}
+
+/* ------------------------------------------------------------------------ */
+/* خدمة الحوكمة والالتزام والمخاطر (أُضيف 2026-09-05) — قراءة عامة، مصادقة    */
+/* اختيارية (OptionalJwtAuthGuard فى backend، لا تسجيل دخول إلزامى).          */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * POST /api/governance/assess — تقييم مطابقة إجراء/قرار مع قوانين ولوائح
+ * الحوكمة والالتزام والمخاطر المفهرَسة (مكافحة غسل أموال/تمويل إرهاب، تأمين،
+ * تمويل غير مصرفى). ⚠️ دقة هذه الخدمة قيد التحقق الفعلى — راجع تنبيه الواجهة.
+ */
+export async function postGovernanceAssess(
+  payload: GovernanceAssessRequest,
+): Promise<GovernanceAssessResponse> {
+  return requestJson<GovernanceAssessResponse>('/governance/assess', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

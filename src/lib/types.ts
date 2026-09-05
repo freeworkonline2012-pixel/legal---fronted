@@ -334,3 +334,45 @@ export interface GuidanceDetail extends GuidanceListItem {
   body: string;
   updated_at: string;
 }
+
+/* ------------------------------------------------------------------------ */
+/* خدمة الحوكمة والالتزام والمخاطر (أُضيف 2026-09-05) — يطابق backend حرفياً: */
+/* AssessGovernanceDto / GovernanceVerdictResponseDto / GovernanceLegalBasisDto. */
+/* ⚠️ نقطة نهاية مستقلة عن /api/questions — عقد أضيق عمداً (بلا status/         */
+/* last_amended فى الأساس القانونى)، وسياسة "معلومات غير كافية" أكثر تحفظاً.   */
+/* ملاحظة نطاق مهمة: دقة هذه الخدمة قيد التحقق الفعلى وقت كتابة هذا (قياس أول  */
+/* 44%/29% تبيّن أنه ملوَّث بعطل بنية تحتية خارجى — راجع تقارير المشروع)؛      */
+/* الواجهة هنا تعرض النتيجة كما هى مع تنبيه صريح، دون أى تجميل للنتيجة.        */
+/* ------------------------------------------------------------------------ */
+
+/** الأحكام الأربعة الممكنة — يطابق enum GovernanceVerdictResponseDto.verdict */
+export type GovernanceVerdict = 'متوافق' | 'غير متوافق' | 'متوافق جزئياً' | 'معلومات غير كافية';
+
+/**
+ * عنصر أساس قانونى واحد فى حكم الحوكمة — يطابق GovernanceLegalBasisDto.
+ * ⚠️ عمداً أضيق من Citation (بلا status/last_amended — غير موجودين فى عقد
+ * backend لهذه الخدمة تحديداً؛ لا تفترض تطابقاً كاملاً مع Citation).
+ */
+export interface GovernanceLegalBasis {
+  law: string;
+  law_no: number;
+  law_year: number;
+  article_no: number;
+  snippet: string;
+  /** رابط المصدر الرسمى — nullable (نفس مبدأ Citation.official_url) */
+  official_url: string | null;
+}
+
+/** طلب POST /api/governance/assess — يطابق AssessGovernanceDto (10-4000 حرفاً) */
+export interface GovernanceAssessRequest {
+  action_description: string;
+}
+
+/** رد POST /api/governance/assess — يطابق GovernanceVerdictResponseDto */
+export interface GovernanceAssessResponse {
+  verdict: GovernanceVerdict;
+  legal_basis: GovernanceLegalBasis[];
+  risk_note: string;
+  /** ثقة داخلية اختيارية — لا تُعرض كضمان دقة للمستخدم مباشرة (نفس تعليق backend) */
+  confidence?: number;
+}
