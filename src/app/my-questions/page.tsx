@@ -109,7 +109,7 @@ export default function MyQuestionsPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 pb-28 sm:px-8 lg:pb-10">
         <div className="flex items-center justify-between gap-4">

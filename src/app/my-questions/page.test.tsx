@@ -15,7 +15,7 @@
  * (نفس نمط BottomNav.test.tsx وHeader.test.tsx).
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MyQuestionsPage from './page';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -98,9 +98,16 @@ describe('MyQuestionsPage', () => {
     mockedFetchQuestionHistory.mockRejectedValue(new Error('فشل طلب الخلفية (HTTP 401)'));
     renderPage();
 
-    expect(await screen.findByText(/سجّل الدخول أولاً/)).toBeInTheDocument();
-    // زر الانتقال لتسجيل الدخول
-    expect(screen.getByRole('link', { name: 'تسجيل الدخول' })).toBeInTheDocument();
+    const title = await screen.findByText(/سجّل الدخول أولاً/);
+    expect(title).toBeInTheDocument();
+    // زر الانتقال لتسجيل الدخول — نطاق البحث داخل بطاقة EmptyState تحديداً
+    // (الهيدر يعرض رابط "تسجيل الدخول" أيضاً بعد تفعيل showAuth افتراضياً
+    // فى كل الصفحات 2026-09-05، فاستعلام غير مقيَّد يجد عنصرين).
+    const emptyStateCard = title.closest('div');
+    expect(emptyStateCard).not.toBeNull();
+    expect(
+      within(emptyStateCard as HTMLElement).getByRole('link', { name: 'تسجيل الدخول' }),
+    ).toBeInTheDocument();
   });
 
   it('يعرض معاينة تجريبية صريحة عند فشل الاتصال (بانر تحذيري + بيانات تجريبية)', async () => {

@@ -18,7 +18,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
       <main className="mx-auto w-full max-w-[900px] flex-1 px-4 py-8 pb-24 sm:px-8 lg:pb-8">
         {Number.isFinite(parsedArticleNo) ? (
           <ArticleDetailScreen lawId={id} articleNo={parsedArticleNo} />

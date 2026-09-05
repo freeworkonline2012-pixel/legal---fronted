@@ -105,7 +105,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
 
       <main className="mx-auto flex w-full max-w-[1200px] flex-1 items-start justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-md">
