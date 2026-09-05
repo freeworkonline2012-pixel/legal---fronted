@@ -60,8 +60,9 @@ export function Header({ showAuth = false }: HeaderProps) {
     <header className="header-surface sticky top-0 z-sticky-header border-b border-border-default">
       <div className="mx-auto flex h-16 w-full max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-8">
         {/* تحديث الهوية 2026-09-05 (بطلب صريح): الاسم أصبح "شيلد" كعنوان رئيسى
-            مع أيقونة Scale نفسها بلون ذهبى بدل لون primary، تتبعها "منصة قانونية
-            عربية" كوصف فرعى. لم يُستبدل بشعار صورة — لا يوجد ملف شعار فعلى
+            يُقرَأ أولاً (قبل الأيقونة مباشرة)، ثم أيقونة Scale نفسها بلون ذهبى
+            بدل لون primary تتوسط الاسم والوصف الفرعى، ثم "منصة قانونية عربية"
+            كوصف فرعى بعدها. لم يُستبدل بشعار صورة — لا يوجد ملف شعار فعلى
             مرفوع من صاحب المشروع (بُحث فى المستودعين وDownloads، راجع تقرير
             التسليم)؛ إن تم توفير شعار لاحقاً يستبدل أيقونة Scale مباشرة هنا. */}
         <Link
@@ -69,13 +70,11 @@ export function Header({ showAuth = false }: HeaderProps) {
           className="flex min-h-[44px] items-center gap-2.5 rounded-md focus-visible:outline-none"
           aria-label="شيلد — منصة قانونية عربية — الرئيسية"
         >
+          <span className="text-h4 font-bold text-text-primary">شيلد</span>
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft">
             <Scale className="h-5 w-5 text-[#B8860B]" aria-hidden="true" />
           </span>
-          <span className="flex items-baseline gap-2">
-            <span className="text-h4 font-bold text-text-primary">شيلد</span>
-            <span className="text-body-sm text-text-secondary">منصة قانونية عربية</span>
-          </span>
+          <span className="text-body-sm text-text-secondary">منصة قانونية عربية</span>
         </Link>
 
         <nav aria-label="التنقل الرئيسي" className="flex items-center gap-1 sm:gap-2">
