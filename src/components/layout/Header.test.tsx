@@ -2,11 +2,12 @@
  * اختبارات Header — الهيدر الثابت (component_states.md القسم 15).
  *
  * يغطي:
- * - الشعار والروابط الرئيسية.
- * - حالة عدم وجود جلسة: أزرار الدخول/التسجيل.
+ * - الشعار والروابط الرئيسية (و"اشترك" غير موجود — أُخفى من القائمة).
+ * - حالة عدم وجود جلسة: "جرّب مجاناً" فقط ("تسجيل الدخول" مُخفى — بطلب
+ *   صريح 2026-09-05).
  * - حالة وجود جلسة: البريد + زر الخروج.
- * - showAuth=false: إخفاء أزرار المصادقة (شاشات التطبيق المعتمدة).
- * - تسجيل الخروج: استدعاء logoutUser + عودة أزرار الدخول.
+ * - showAuth=false: إخفاء زر "جرّب مجاناً" (شاشات التطبيق المعتمدة).
+ * - تسجيل الخروج: استدعاء logoutUser + عودة زر "جرّب مجاناً".
  */
 
 import { render, screen } from '@testing-library/react';
@@ -64,11 +65,14 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تحقق الالتزام' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
+    // أُخفيا من القائمة العلوية بطلب صريح 2026-09-05 — الصفحتان (/login،
+    // /pricing) تبقيان تعملان، فقط أُزيل الرابطان من التنقل الرئيسى.
+    expect(screen.queryByRole('link', { name: 'اشترك' })).not.toBeInTheDocument();
   });
 
-  it('يعرض أزرار الدخول والتسجيل عند غياب الجلسة', () => {
+  it('يعرض «جرّب مجاناً» فقط (لا «تسجيل الدخول») عند غياب الجلسة', () => {
     renderHeader();
-    expect(screen.getByRole('link', { name: 'تسجيل الدخول' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'تسجيل الدخول' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'جرّب مجاناً' })).toBeInTheDocument();
   });
 
@@ -81,11 +85,10 @@ describe('Header', () => {
 
   it('يخفي أزرار المصادقة عند showAuth=false', () => {
     renderHeader(false);
-    expect(screen.queryByRole('link', { name: 'تسجيل الدخول' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'جرّب مجاناً' })).not.toBeInTheDocument();
   });
 
-  it('يسجّل الخروج: يستدعي logoutUser ويمسح الجلسة ويعود لأزرار الدخول', async () => {
+  it('يسجّل الخروج: يستدعي logoutUser ويمسح الجلسة ويعود لزر «جرّب مجاناً»', async () => {
     const user = userEvent.setup();
     setAuthSession(SESSION);
     renderHeader();
@@ -94,8 +97,10 @@ describe('Header', () => {
     await user.click(screen.getByRole('button', { name: 'خروج' }));
 
     expect(mockedLogoutUser).toHaveBeenCalledTimes(1);
-    // إعادة العرض بعد مسح الجلسة غير متزامنة (await داخل المعالج) — ننتظرها
-    expect(await screen.findByRole('link', { name: 'تسجيل الدخول' })).toBeInTheDocument();
+    // إعادة العرض بعد مسح الجلسة غير متزامنة (await داخل المعالج) — ننتظرها.
+    // "تسجيل الدخول" مُخفى من القائمة (بطلب صريح 2026-09-05)، فالزر الذى
+    // يعود هو "جرّب مجاناً" (يشير أصلاً لنفس صفحة /login).
+    expect(await screen.findByRole('link', { name: 'جرّب مجاناً' })).toBeInTheDocument();
     expect(screen.queryByText('user@example.com')).not.toBeInTheDocument();
   });
 });
