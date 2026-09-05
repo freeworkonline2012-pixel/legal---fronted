@@ -19,7 +19,7 @@ export default async function LawsPage({ searchParams }: LawsPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 pb-24 sm:px-8 lg:pb-8">
         <h1 className="text-h1 font-bold text-text-primary">القوانين</h1>
         <p className="mt-2 max-w-2xl text-body text-text-secondary">

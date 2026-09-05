@@ -17,7 +17,7 @@
  * - الحالة الفارغة بعد حسم كل العناصر (لا طريق مسدود).
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewPage from './page';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -207,8 +207,16 @@ describe('ReviewPage', () => {
     mockedFetchReviewQueue.mockRejectedValue(new Error('فشل طلب الخلفية (HTTP 401)'));
     renderPage();
 
-    expect(await screen.findByText(/سجّل الدخول أولاً/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'تسجيل الدخول' })).toBeInTheDocument();
+    const title = await screen.findByText(/سجّل الدخول أولاً/);
+    expect(title).toBeInTheDocument();
+    // نطاق البحث داخل بطاقة EmptyState تحديداً — الهيدر (بعد تفعيل showAuth
+    // افتراضياً فى كل الصفحات 2026-09-05) يعرض رابط "تسجيل الدخول" أيضاً،
+    // فاستعلام غير مقيَّد سيجد عنصرين بنفس الاسم.
+    const emptyStateCard = title.closest('div');
+    expect(emptyStateCard).not.toBeNull();
+    expect(
+      within(emptyStateCard as HTMLElement).getByRole('link', { name: 'تسجيل الدخول' }),
+    ).toBeInTheDocument();
   });
 
   it('يعرض رسالة صلاحيات عند استجابة 403', async () => {

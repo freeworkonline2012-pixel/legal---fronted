@@ -17,7 +17,7 @@ export default async function LawPage({ params }: LawPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
       <main className="mx-auto w-full max-w-[900px] flex-1 px-4 py-8 pb-24 sm:px-8 lg:pb-8">
         <LawDetailScreen lawId={id} />
       </main>

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function GovernancePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
       <GovernanceScreen />
       <Footer />
       <BottomNav />

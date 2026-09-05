@@ -19,15 +19,19 @@ import { useToast } from '@/components/ui/Toast';
 
 export interface HeaderProps {
   /**
-   * إظهار أزرار الدخول/التسجيل في الهيدر. افتراضياً false: الإصدار الأول (v1)
-   * موجّه لعامة الجمهور بلا تسجيل دخول إلزامى — ميزات الحساب (تسجيل الدخول،
-   * أسئلتي، الخطط) مؤجّلة دون حذف الصفحات نفسها. مرّر true صراحة لإعادة تفعيلها
-   * فى مرحلة لاحقة.
+   * إظهار أزرار الدخول/التسجيل في الهيدر.
+   *
+   * تحديث 2026-09-05 (بطلب صريح): الافتراضى أصبح **true** — زر "تسجيل
+   * الدخول" (أو البريد/خروج عند وجود جلسة) يظهر الآن فى كل صفحات الموقع.
+   * هذا يعكس قراراً سابقاً (2026-08-27/28) كان يُبقيه false افتراضياً بحجة
+   * أن الإصدار الأول (v1) موجّه لعامة الجمهور بلا تسجيل دخول إلزامى — ذلك
+   * القرار أُلغِى صراحة بطلب صاحب المشروع. مرّر false صراحة لإخفائه فى صفحة
+   * بعينها إن لزم مستقبلاً (لا يوجد استخدام لذلك حالياً بعد هذا التحديث).
    */
   showAuth?: boolean;
 }
 
-export function Header({ showAuth = false }: HeaderProps) {
+export function Header({ showAuth = true }: HeaderProps) {
   const { showToast } = useToast();
   const [authed, setAuthed] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);

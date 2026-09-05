@@ -21,7 +21,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
 
   return (
     <div className="min-h-screen bg-background font-ui text-text-primary">
-      <Header showAuth={false} />
+      <Header />
       <ChatScreen initialQuestion={initialQuestion} />
       <BottomNav />
     </div>
