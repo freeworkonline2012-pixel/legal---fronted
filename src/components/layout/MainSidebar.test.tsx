@@ -102,18 +102,32 @@ describe('MainSidebar', () => {
     expect(screen.getByText('قريباً')).toBeInTheDocument();
   });
 
-  it('فتح دولة تحتوى قوانين يُظهر مجالاتها القانونية كروابط', async () => {
+  it('فتح دولة تحتوى قوانين يُظهر تصنيف "المكتبة القانونية" ومجالاتها الفرعية', async () => {
     const user = userEvent.setup();
     renderSidebar();
     const egyptButton = await screen.findByRole('button', { name: /مصر/ });
     await user.click(egyptButton);
 
-    const laborLink = await screen.findByRole('link', { name: /قانون العمل/ });
-    expect(laborLink).toHaveAttribute('href', '/laws?country=EG&category=labor');
-    expect(screen.getByRole('link', { name: /كل قوانين مصر/ })).toHaveAttribute(
+    expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'القوانين' })).toHaveAttribute(
       'href',
       '/laws?country=EG',
     );
+    expect(screen.getByRole('link', { name: 'القرارات' })).toHaveAttribute(
+      'href',
+      '/decisions?country=EG',
+    );
+    expect(screen.getByRole('link', { name: 'اللوائح التنفيذية' })).toHaveAttribute(
+      'href',
+      '/regulations?country=EG',
+    );
+    expect(screen.getByRole('link', { name: 'الأدلة الاسترشادية' })).toHaveAttribute(
+      'href',
+      '/guidance',
+    );
+
+    const laborLink = await screen.findByRole('link', { name: /قانون العمل/ });
+    expect(laborLink).toHaveAttribute('href', '/laws?country=EG&category=labor');
   });
 
   it('دولة "قريباً" لا تُفتح عند النقر', async () => {
@@ -122,7 +136,7 @@ describe('MainSidebar', () => {
     const saudiButton = await screen.findByRole('button', { name: /السعودية/ });
     expect(saudiButton).toBeDisabled();
     await user.click(saudiButton);
-    expect(screen.queryByRole('link', { name: /كل قوانين السعودية/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('المكتبة القانونية')).not.toBeInTheDocument();
   });
 
   it('لا تظهر "محادثاتى" لزائر غير مسجّل — تظهر دعوة لتسجيل الدخول بدلاً منها', async () => {
