@@ -59,7 +59,7 @@ describe('Header', () => {
     expect(brandLink).toBeInTheDocument();
     expect(brandLink).toHaveTextContent('شيلد');
     expect(brandLink).toHaveTextContent('منصة قانونية عربية');
-    expect(screen.getByRole('link', { name: 'الأسئلة' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'الرئيسية' })).toHaveAttribute('href', '/chat');
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تحقق الالتزام' })).toBeInTheDocument();
