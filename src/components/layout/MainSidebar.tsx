@@ -4,11 +4,16 @@
  *
  * البنية الجديدة:
  * 1. القائمة الرئيسية: شجرة تصفح بالدولة المستهدفة (مصر أولاً، ثم السعودية/
- *    الإمارات/قطر/البحرين) — كل دولة تُفتح لتُظهر المجالات القانونية المتوفرة
- *    فيها بعدد القوانين الفعلى لكل مجال، وتؤدى إلى /laws?country=..&category=..
- *    (صفحة LawsBrowser الكاملة هى مصدر عرض القوانين فعلياً — الشريط الجانبى
- *    للتصفح لا لعرض مئات العناوين فى مساحة 280px). الدول التى لا تحتوى أى
- *    قانون مُدخَل بعد تظهر بشارة "قريباً" ولا تُفتح.
+ *    الإمارات/قطر/البحرين) — كل دولة تُفتح لتُظهر تصنيف "المكتبة القانونية"
+ *    (بطلب صريح 2026-09-05، يستبدل رابط "كل قوانين {الدولة}" السابق): أربعة
+ *    أنواع محتوى — القوانين (وتحتها المجالات القانونية الفرعية بعددها الفعلى
+ *    لكل مجال، تؤدى إلى /laws?country=..&category=..)، القرارات
+ *    (/decisions?country=..)، اللوائح التنفيذية (/regulations?country=..)،
+ *    والأدلة الاسترشادية (/guidance — بلا معامل دولة، لأن هذا المحتوى غير
+ *    مقسَّم بالدولة بعد فى نموذج البيانات الحالى). صفحات كل نوع محتوى هى
+ *    مصدر العرض الكامل فعلياً — الشريط الجانبى للتصفح لا لعرض مئات العناوين
+ *    فى مساحة 280px. الدول التى لا تحتوى أى قانون مُدخَل بعد تظهر بشارة
+ *    "قريباً" ولا تُفتح.
  * 2. محادثاتى: تظهر فقط بعد تسجيل الدخول (isAuthenticated). ⚠️ المرحلة
  *    الحالية: هذا القسم شكلى (بيانات وهمية) — لا يوجد بعد تخزين محادثات فعلى
  *    فى الخلفية (قرار عمل موثّق: "إخفاء خلف تسجيل الدخول فقط الآن"، مرحلة
@@ -183,31 +188,75 @@ export function MainSidebar({
                   </button>
 
                   {isExpanded && !isComingSoon ? (
-                    <ul className="me-2 mt-1 space-y-0.5 border-e border-border-default ps-3">
-                      <li>
-                        <Link
-                          href={`/laws?country=${country.code}`}
-                          className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm text-text-secondary hover:bg-surface hover:text-text-primary"
-                        >
-                          كل قوانين {country.name_ar}
-                        </Link>
-                      </li>
-                      {categories.map(({ category, count }) => (
-                        <li key={category}>
+                    /* تصنيف "المكتبة القانونية" (بطلب صريح 2026-09-05): يستبدل
+                       رابط "كل قوانين {الدولة}" السابق بعنوان قسم غير قابل
+                       للنقر، تحته أربعة أنواع محتوى: القوانين (ومجالاتها
+                       القانونية الفرعية — نفس القائمة التى كانت تظهر مباشرة
+                       سابقاً، أصبحت الآن فرعية تحت "القوانين" تحديداً بطلب
+                       صريح)، ثم القرارات، فاللوائح التنفيذية، فالأدلة
+                       الاسترشادية. الثلاثة الأولى تُمرَّر بمعامل ?country=
+                       (تدعمه فعلياً صفحات /laws و/decisions و/regulations) —
+                       أما "الأدلة الاسترشادية" فرابطها بلا معامل دولة، لأن
+                       /guidance لا تدعم بعد التصفية حسب الدولة (محتوى غير
+                       مقسَّم بالدولة فى نموذج البيانات الحالى). */
+                    <div className="me-2 mt-1 border-e border-border-default ps-3">
+                      <p className="px-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+                        المكتبة القانونية
+                      </p>
+                      <ul className="mt-0.5 space-y-0.5">
+                        <li>
                           <Link
-                            href={`/laws?country=${country.code}&category=${category}`}
-                            className="flex min-h-[36px] items-center justify-between gap-2 rounded-md px-2 text-body-sm text-text-secondary hover:bg-surface hover:text-text-primary"
+                            href={`/laws?country=${country.code}`}
+                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
                           >
-                            <span className="truncate">
-                              {isDomainKey(category) ? domainChipTokens[category].label : category}
-                            </span>
-                            <span className="text-[11px] text-text-tertiary" dir="ltr">
-                              {count}
-                            </span>
+                            القوانين
+                          </Link>
+                          {categories.length > 0 ? (
+                            <ul className="me-2 mt-0.5 space-y-0.5 border-e border-border-default ps-3">
+                              {categories.map(({ category, count }) => (
+                                <li key={category}>
+                                  <Link
+                                    href={`/laws?country=${country.code}&category=${category}`}
+                                    className="flex min-h-[36px] items-center justify-between gap-2 rounded-md px-2 text-body-sm text-text-secondary hover:bg-surface hover:text-text-primary"
+                                  >
+                                    <span className="truncate">
+                                      {isDomainKey(category) ? domainChipTokens[category].label : category}
+                                    </span>
+                                    <span className="text-[11px] text-text-tertiary" dir="ltr">
+                                      {count}
+                                    </span>
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </li>
+                        <li>
+                          <Link
+                            href={`/decisions?country=${country.code}`}
+                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
+                          >
+                            القرارات
                           </Link>
                         </li>
-                      ))}
-                    </ul>
+                        <li>
+                          <Link
+                            href={`/regulations?country=${country.code}`}
+                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
+                          >
+                            اللوائح التنفيذية
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            href="/guidance"
+                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
+                          >
+                            الأدلة الاسترشادية
+                          </Link>
+                        </li>
+                      </ul>
+                    </div>
                   ) : null}
                 </li>
               );
