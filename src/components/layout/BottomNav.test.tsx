@@ -2,9 +2,9 @@
  * اختبارات BottomNav — شريط التنقل السفلي للموبايل.
  *
  * يغطي:
- * - عناصر التنقل الأربعة (الأسئلة/القوانين/الأدلة/الحوكمة — بعد إزالة
+ * - عناصر التنقل الخمسة (الأسئلة/القوانين/الأدلة/الحوكمة/العقود — بعد إزالة
  *   أسئلتي/الخطط/حسابي المتطلبة تسجيل دخول من نطاق الإصدار الأول، 2026-08-27؛
- *   وإضافة الحوكمة 2026-09-05).
+ *   وإضافة الحوكمة 2026-09-05، ثم العقود 2026-09-05).
  * - تمييز العنصر النشط بـ aria-current (لا لون وحده — WCAG 1.4.1).
  */
 
@@ -19,13 +19,14 @@ jest.mock('next/navigation', () => ({
 }));
 
 describe('BottomNav', () => {
-  it('يعرض عناصر التنقل الأربعة', () => {
+  it('يعرض عناصر التنقل الخمسة', () => {
     mockUsePathname.mockReturnValue('/chat');
     render(<BottomNav />);
     expect(screen.getByRole('link', { name: 'الأسئلة' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الأدلة' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الحوكمة' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'العقود' })).toBeInTheDocument();
   });
 
   it('يعلّم العنصر النشط بـ aria-current="page" فقط', () => {

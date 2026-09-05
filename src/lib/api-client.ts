@@ -10,6 +10,7 @@ import type {
   ArticleDetail,
   ArticleListResponse,
   AuthResponse,
+  ContractResponse,
   CountryListResponse,
   DomainKey,
   FeedbackPayload,
@@ -282,4 +283,64 @@ export async function postGovernanceAssess(
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+/* ------------------------------------------------------------------------ */
+/* خدمة المدقق القانونى للعقود (Service 2، أُضيف 2026-09-05) — مصادقة        */
+/* إلزامية (JwtAuthGuard فى backend، بخلاف كل الخدمات أعلاه) — بيانات عقود   */
+/* عمل حقيقية للمستخدم، لا مسار مجهول الهوية هنا.                            */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * POST /api/contracts — رفع عقد (PDF/DOCX) لاستخراج بنوده وتقييمها الأولى.
+ *
+ * ⚠️ لا تستخدم requestJson هنا: الجسم FormData (multipart/form-data) لا JSON،
+ * ويجب **عدم** تعيين رأس Content-Type يدوياً — المتصفح يحسب حدّ الفصل
+ * (boundary) الصحيح تلقائياً فقط عند ترك الرأس للمتصفح؛ تعيينه صراحة (كما
+ * تفعل requestJson لـ 'application/json') يُفسد الطلب بالكامل فى الخلفية
+ * (NestJS/multer يفشل فى تحليل الجسم إن غاب الـboundary الصحيح).
+ *
+ * 401 متوقَّع دائماً بلا جلسة (مصادقة إلزامية) — المكوّن المستدعى مسؤول عن
+ * التحقق من isAuthenticated() قبل عرض نموذج الرفع أصلاً (راجع ContractsScreen).
+ */
+export async function uploadContract(file: File): Promise<ContractResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/contracts`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+
+  if (!res.ok) {
+    // رسالة الخلفية (مثال: "نوع ملف غير مدعوم") أدق من نص عام — تُقرأ إن أمكن.
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: string };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON — نتجاهله ونستخدم رسالة عامة أدناه.
+    }
+    throw new ApiError(res.status, detail ?? `فشل رفع العقد (HTTP ${res.status})`);
+  }
+
+  return (await res.json()) as ContractResponse;
+}
+
+/** GET /api/contracts/{id} — حالة عقد وبنوده وتقييمها (401 بلا جلسة، 403 لغير المالك، 404 لعقد غير موجود) */
+export async function fetchContract(id: string): Promise<ContractResponse> {
+  return requestJson<ContractResponse>(`/contracts/${encodeURIComponent(id)}`);
 }

@@ -60,6 +60,7 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تحقق الالتزام' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
   });
 
   it('يعرض أزرار الدخول والتسجيل عند غياب الجلسة', () => {

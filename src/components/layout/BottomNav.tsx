@@ -10,17 +10,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, MessageSquareText, ScrollText, Scale } from 'lucide-react';
+import { BookOpen, FileCheck2, MessageSquareText, ScrollText, Scale } from 'lucide-react';
 
 // «أسئلتي» و«الخطط»/«حسابي» تتطلب تسجيل دخول — مؤجّلة خارج نطاق الإصدار الأول
 // (عامة الجمهور، بلا تسجيل دخول). استُبدلت بروابط تصفح القوانين/الأدلة الإرشادية.
 // أُضيف "الحوكمة" (2026-09-05) — أول واجهة أمامية لخدمة الحوكمة (Service 3)؛
 // راجع تعليق GovernanceScreen بخصوص حالة التحقق من الدقة الحالية.
+// أُضيف "العقود" (2026-09-05) — أول واجهة أمامية لخدمة المدقق القانونى للعقود
+// (Service 2)؛ الرابط ظاهر دائماً رغم أن الصفحة تتطلب تسجيل دخول (نفس منطق
+// Header.tsx — الصفحة نفسها تعرض دعوة لتسجيل الدخول بدل إخفاء الرابط).
 const NAV_ITEMS = [
   { href: '/chat', label: 'الأسئلة', icon: MessageSquareText },
   { href: '/laws', label: 'القوانين', icon: Scale },
   { href: '/guidance', label: 'الأدلة', icon: BookOpen },
   { href: '/governance', label: 'الحوكمة', icon: ScrollText },
+  { href: '/contracts', label: 'العقود', icon: FileCheck2 },
 ] as const;
 
 export function BottomNav() {
@@ -31,7 +35,7 @@ export function BottomNav() {
       aria-label="التنقل السفلي"
       className="fixed inset-x-0 bottom-0 z-sticky-header border-t border-border-default bg-surface md:hidden"
     >
-      <ul className="grid h-16 grid-cols-4">
+      <ul className="grid h-16 grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
