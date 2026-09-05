@@ -55,7 +55,10 @@ describe('Header', () => {
 
   it('يعرض الشعار والروابط الرئيسية', () => {
     renderHeader();
-    expect(screen.getByRole('link', { name: /منصة قانونية عربية/ })).toBeInTheDocument();
+    const brandLink = screen.getByRole('link', { name: /شيلد.*منصة قانونية عربية/ });
+    expect(brandLink).toBeInTheDocument();
+    expect(brandLink).toHaveTextContent('شيلد');
+    expect(brandLink).toHaveTextContent('منصة قانونية عربية');
     expect(screen.getByRole('link', { name: 'الأسئلة' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
