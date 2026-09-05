@@ -78,26 +78,21 @@ export function Header({ showAuth = false }: HeaderProps) {
         </Link>
 
         <nav aria-label="التنقل الرئيسي" className="flex items-center gap-1 sm:gap-2">
-          {/* ترتيب القائمة (حُدِّث 2026-08-28): الأسئلة - اشترك - القوانين -
-              القرارات - اللوائح التنفيذية - الأدلة الإرشادية. «اشترك» رابط
-              تسويقى مباشر لصفحة /pricing (غير مرتبط بحالة تسجيل الدخول عمداً
-              — بخلاف زرّى تسجيل الدخول/جرّب مجاناً أدناه المقيّدين بـshowAuth).
-              تحديث 2026-09-05 (بطلب صريح): نص الرابط الأول تغيّر من "الأسئلة"
-              إلى "الرئيسية" — الرابط نفسه لم يتغيّر وما زال يشير إلى /chat
-              (شاشة طرح الأسئلة)، وليس / (صفحة الهبوط الفعلية التى يشير إليها
-              شعار "شيلد" أقصى اليمين). أُبلغ صاحب القرار بهذا التمايز صراحة
-              قبل التنفيذ وأكّد أنه يريد تغيير النص فقط. */}
+          {/* ترتيب القائمة (أُعيد ترتيبه بالكامل 2026-09-05 بطلب صريح):
+              الرئيسية - القوانين - القرارات - اللوائح التنفيذية -
+              الأدلة الإرشادية - تدقيق العقود - تحقق الالتزام - [تبديل الوضع] -
+              تسجيل الدخول/جرّب مجاناً (أو البريد/خروج عند وجود جلسة) - اشترك.
+              «اشترك» انتقل من الموضع الثانى إلى نهاية القائمة (بطلب صريح)،
+              ويبقى رابطاً تسويقياً مباشراً لصفحة /pricing غير مرتبط بحالة
+              تسجيل الدخول (خلافاً لأزرار تسجيل الدخول/جرّب مجاناً المقيّدة
+              بـshowAuth). زر تبديل الوضع الليلى لم يُذكر صراحة فى الترتيب
+              المطلوب (ليس رابط تنقل بل أداة مساعدة دائمة) فأُبقى فى موضعه
+              المنطقى المعتاد — بعد آخر رابط محتوى وقبل مجموعة الحساب. */}
           <Link
             href="/chat"
             className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
           >
             الرئيسية
-          </Link>
-          <Link
-            href="/pricing"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            اشترك
           </Link>
           <Link
             href="/laws"
@@ -123,18 +118,6 @@ export function Header({ showAuth = false }: HeaderProps) {
           >
             الأدلة الإرشادية
           </Link>
-          {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة الحوكمة (Service 3) —
-              كانت API فقط بلا أى صفحة (Phase 3 مؤجَّلة). ⚠️ دقة الخدمة قيد
-              التحقق الفعلى وقت الإضافة (راجع تعليق GovernanceScreen) — الرابط
-              ظاهر عمداً بنفس شكل باقى القائمة (لا "تجريبي" فى نص الرابط نفسه)
-              لأن الصفحة نفسها تحمل تنبيهاً دائماً بارزاً غير قابل للطى، وهذا
-              أنسب مكان لذلك التحذير من ازدحام نص القائمة العلوية. */}
-          <Link
-            href="/governance"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            تحقق الالتزام
-          </Link>
           {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة المدقق القانونى للعقود
               (Service 2) — كانت API فقط بلا أى صفحة (Phase 3+4 مؤجَّلتان).
               بخلاف كل الروابط الأخرى هنا، هذه الصفحة تتطلب تسجيل دخول إلزامياً
@@ -146,6 +129,18 @@ export function Header({ showAuth = false }: HeaderProps) {
             className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
           >
             تدقيق العقود
+          </Link>
+          {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة الحوكمة (Service 3) —
+              كانت API فقط بلا أى صفحة (Phase 3 مؤجَّلة). ⚠️ دقة الخدمة قيد
+              التحقق الفعلى وقت الإضافة (راجع تعليق GovernanceScreen) — الرابط
+              ظاهر عمداً بنفس شكل باقى القائمة (لا "تجريبي" فى نص الرابط نفسه)
+              لأن الصفحة نفسها تحمل تنبيهاً دائماً بارزاً غير قابل للطى، وهذا
+              أنسب مكان لذلك التحذير من ازدحام نص القائمة العلوية. */}
+          <Link
+            href="/governance"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            تحقق الالتزام
           </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم
@@ -181,6 +176,12 @@ export function Header({ showAuth = false }: HeaderProps) {
               </div>
             )
           ) : null}
+          <Link
+            href="/pricing"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            اشترك
+          </Link>
         </nav>
       </div>
     </header>

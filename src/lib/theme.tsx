@@ -85,7 +85,18 @@ export function useTheme(): ThemeContextValue {
   return ctx;
 }
 
-/** زر تبديل الوضع الليلي — دائماً أيقونة + نص (لا لون وحده — WCAG 1.4.1) */
+/**
+ * زر تبديل الوضع الليلي — أيقونة فقط (بطلب صريح 2026-09-05: أُزيل النص
+ * المرئى "الوضع الفاتح"/"الوضع الليلي" من الهيدر، وأُبقى على الأيقونة وحدها
+ * للتعبير عن الوضع الحالى).
+ *
+ * إتاحة الوصول لا تزال مكفولة رغم إزالة النص المرئى:
+ * - الأيقونتان مختلفتا الشكل (قمر/شمس) لا لون وحده يميّز بينهما — لا علاقة
+ *   لهذا بقاعدة WCAG 1.4.1 (منع الاعتماد على اللون وحده) أصلاً.
+ * - `aria-label` و`title` ما زالا يحملان النص الكامل ("الوضع الفاتح"/"الوضع
+ *   الليلي") — قارئ الشاشة يعلن الاسم الكامل، والتلميح (tooltip) عند التحويم
+ *   يظهر للمستخدم المبصر أيضاً.
+ */
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
@@ -97,14 +108,13 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={label}
       title={label}
-      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-3 text-body-sm text-text-secondary transition-colors duration-[120ms] hover:bg-surface-muted focus-visible:outline-none"
+      className="inline-flex h-11 w-11 min-h-[44px] items-center justify-center rounded-md text-text-secondary transition-colors duration-[120ms] hover:bg-surface-muted focus-visible:outline-none"
     >
       {isDark ? (
         <Sun className="h-5 w-5" aria-hidden="true" />
       ) : (
         <Moon className="h-5 w-5" aria-hidden="true" />
       )}
-      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
