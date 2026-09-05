@@ -123,6 +123,18 @@ export function Header({ showAuth = false }: HeaderProps) {
           >
             تحقق الالتزام
           </Link>
+          {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة المدقق القانونى للعقود
+              (Service 2) — كانت API فقط بلا أى صفحة (Phase 3+4 مؤجَّلتان).
+              بخلاف كل الروابط الأخرى هنا، هذه الصفحة تتطلب تسجيل دخول إلزامياً
+              فى backend (بيانات عقود عمل حقيقية) — الرابط يبقى ظاهراً دائماً
+              (بلا شرط showAuth) لأن الصفحة نفسها تتولى دعوة غير المسجَّل
+              لتسجيل الدخول (راجع ContractsScreen)، بدل إخفاء الرابط بالكامل. */}
+          <Link
+            href="/contracts"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            تدقيق العقود
+          </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم
               تُحذف وتبقى تعمل عبر الرابط المباشر — أُزيلت من التنقل الرئيسى فقط.

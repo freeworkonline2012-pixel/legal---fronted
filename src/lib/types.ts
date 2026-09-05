@@ -376,3 +376,62 @@ export interface GovernanceAssessResponse {
   /** ثقة داخلية اختيارية — لا تُعرض كضمان دقة للمستخدم مباشرة (نفس تعليق backend) */
   confidence?: number;
 }
+
+/* ------------------------------------------------------------------------ */
+/* خدمة المدقق القانونى للعقود (Service 2، أُضيف 2026-09-05) — يطابق backend  */
+/* حرفياً: Contract/ContractClause entities وContractResponseDto/            */
+/* ContractClauseResponseDto (src/contracts/dto فى backend). Phase 1+2       */
+/* الأساسية فقط — أعمدة Phase 3 (risk_level/suggested_wording/lawyer_*)      */
+/* محجوزة فى backend لكن غير معروضة هنا لأنها غير مُستخدَمة فى الرد بعد.      */
+/* ⚠️ مصادقة إلزامية (JwtAuthGuard فى backend، بخلاف الحوكمة/الأسئلة) — هذه   */
+/* بيانات عقود عمل حقيقية للمستخدم، لا مسار مجهول الهوية هنا.                 */
+/* ------------------------------------------------------------------------ */
+
+/** حالة معالجة العقد — تطابق ContractStatus فى backend (contract.entity.ts) */
+export type ContractStatus = 'uploaded' | 'processing' | 'processed' | 'extraction_failed';
+
+/**
+ * حالة تقييم بند واحد — تطابق ClauseAssessmentStatus فى backend
+ * (contract-clause.entity.ts). لا "منخفض/عالٍ" هنا (Phase 3 مؤجَّلة) — ثلاث
+ * حالات فقط، والحالة الثالثة رفض أمين متعمَّد (لا نص مفهرَس ذو صلة)، لا خطأ.
+ */
+export type ClauseAssessmentStatus = 'سليم' | 'يحتاج مراجعة' | 'لا يوجد نص قانونى مصرى مفهرَس ذو صلة مباشرة';
+
+/** مادة قانونية مطابَقة لبند — تطابق MatchedArticle فى backend */
+export interface MatchedArticle {
+  law: string;
+  law_no: number;
+  law_year: number;
+  article_no: number;
+  snippet: string;
+  official_url: string | null;
+}
+
+/** بند واحد من عقد — يطابق ContractClauseResponseDto */
+export interface ContractClauseItem {
+  id: string;
+  clause_index: number;
+  /** نص البند كما ورد حرفياً فى العقد الأصلى، مثال: "البند الرابع عشر" */
+  clause_label: string;
+  clause_title: string | null;
+  clause_type_guess: string | null;
+  clause_text: string;
+  /** null فقط أثناء status='processing' (نادر عملياً — المعالجة متزامنة فى نفس طلب الرفع) */
+  assessment_status: ClauseAssessmentStatus | null;
+  assessment_reasoning: string | null;
+  matched_articles: MatchedArticle[] | null;
+  assessment_confidence: number | null;
+}
+
+/** رد POST /api/contracts وGET /api/contracts/{id} — يطابق ContractResponseDto */
+export interface ContractResponse {
+  id: string;
+  original_filename: string;
+  status: ContractStatus;
+  extraction_error: string | null;
+  clause_count: number | null;
+  /** تحذيرات غير حاجبة من مرحلة التقسيم (مثال: ترقيم بنود غير متسلسل) */
+  warnings?: string[];
+  clauses?: ContractClauseItem[];
+  created_at: string;
+}
