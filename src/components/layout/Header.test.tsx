@@ -63,7 +63,7 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'الرئيسية' })).toHaveAttribute('href', '/chat');
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'تحقق الالتزام' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'الحوكمة والالتزام' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
     // أُخفيا من القائمة العلوية بطلب صريح 2026-09-05 — الصفحتان (/login،
     // /pricing) تبقيان تعملان، فقط أُزيل الرابطان من التنقل الرئيسى.
