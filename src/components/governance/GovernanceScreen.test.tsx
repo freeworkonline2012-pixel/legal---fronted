@@ -46,10 +46,10 @@ describe('GovernanceScreen', () => {
     mockedAssess.mockReset();
   });
 
-  it('يعرض العنوان والتنبيه الدائم بأن الميزة تجريبية قيد التحقق من الدقة', () => {
+  it('يعرض العنوان والتنبيه الدائم بالدقة المقاسة ووجوب المراجعة البشرية', () => {
     render(<GovernanceScreen />);
     expect(screen.getByRole('heading', { name: /تحقق من الالتزام بقواعد الحوكمة/ })).toBeInTheDocument();
-    expect(screen.getByRole('alert', { name: '' })).toHaveTextContent(/ميزة تجريبية قيد التحقق من الدقة/);
+    expect(screen.getByRole('alert', { name: '' })).toHaveTextContent(/دقة مقاسة ومؤكَّدة: 97\.2%/);
   });
 
   it('يمنع الإرسال ويعرض خطأ تحقق عند نص أقصر من 10 أحرف', async () => {

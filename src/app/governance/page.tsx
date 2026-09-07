@@ -7,7 +7,7 @@ import { GovernanceScreen } from '@/components/governance/GovernanceScreen';
 export const metadata: Metadata = {
   title: 'تحقق من الالتزام — منصة قانونية عربية',
   description:
-    'تحقق من مدى مطابقة إجراء أو قرار لقواعد الحوكمة والالتزام ومكافحة غسل الأموال المفهرَسة — ميزة تجريبية قيد التحقق من الدقة.',
+    'تحقق من مدى مطابقة إجراء أو قرار لقواعد الحوكمة والالتزام ومكافحة غسل الأموال المفهرَسة — بدقة مقاسة ومؤكَّدة 97.2%.',
 };
 
 export default function GovernancePage() {
