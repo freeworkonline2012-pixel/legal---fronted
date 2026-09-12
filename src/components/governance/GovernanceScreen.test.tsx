@@ -52,6 +52,13 @@ describe('GovernanceScreen', () => {
     expect(screen.getByRole('alert', { name: '' })).toHaveTextContent(/دقة مقاسة ومؤكَّدة: 97\.2%/);
   });
 
+  it('يفصح صراحة عن استبعاد قرار 205/2021 وقرار 951/2003 من نطاق التغطية', () => {
+    render(<GovernanceScreen />);
+    const alertBanner = screen.getByRole('alert', { name: '' });
+    expect(alertBanner).toHaveTextContent(/205 لسنة 2021/);
+    expect(alertBanner).toHaveTextContent(/951 لسنة 2003/);
+  });
+
   it('يمنع الإرسال ويعرض خطأ تحقق عند نص أقصر من 10 أحرف', async () => {
     const user = userEvent.setup();
     render(<GovernanceScreen />);
