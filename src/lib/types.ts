@@ -67,6 +67,27 @@ export interface Citation {
   snippet: string;
 }
 
+/** مصدر واحد فى نتيجة بحث الويب الاحتياطى (Tier 2) — WebFallbackSourceDto فى backend */
+export interface WebFallbackSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/**
+ * نتيجة طبقة البحث الاحتياطى (Tier 2) — تظهر فقط عندما refused=true وكانت
+ * خاصية ENABLE_WEB_FALLBACK مفعَّلة فى backend ووُجدت نتائج بحث ضمن نطاق
+ * مصادر رسمية مسموحة. answer يتضمن دائماً تنويهاً إلزامياً فى نهايته (يُضاف
+ * برمجياً فى backend، لا يُفترض إضافته هنا). لا تُعامَل بنفس ثقة citations —
+ * لم تُتحقَّق من قاعدة بياناتنا القانونية، لذلك تبقى refused=true ويستمر
+ * الرد فى دخول طابور المراجعة البشرية كالمعتاد (WebFallbackResponseDto فى backend).
+ */
+export interface WebFallback {
+  answer: string;
+  sources: WebFallbackSource[];
+  provider: string;
+}
+
 /** رد POST /api/questions — الحالة الطبيعية أو الرفض (refused) */
 export interface QuestionAnswerResponse {
   /** معرّف الإجابة المحفوظة — يعيده backend في AnswerResponseDto.id (عقد C-2) */
@@ -78,6 +99,8 @@ export interface QuestionAnswerResponse {
   citations: Citation[];
   /** true = رفض الإجابة لعدم كفاية النصوص الموثّقة */
   refused: boolean;
+  /** نتيجة بحث ويب احتياطى غير موثَّقة (Tier 2) — موجودة فقط عند refused=true، وإلا null/undefined */
+  web_fallback?: WebFallback | null;
 }
 
 /** طلب POST /api/questions */
