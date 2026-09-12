@@ -8,7 +8,7 @@
 
 'use client';
 
-import { FileQuestion, RefreshCw, Scale, ShieldX } from 'lucide-react';
+import { ExternalLink, FileQuestion, RefreshCw, Scale, Search, ShieldX } from 'lucide-react';
 import type { QuestionAnswerResponse } from '@/lib/types';
 import { getConfidenceKey } from '@/lib/normalize';
 import { ConfidenceBadge } from '@/components/ui/ConfidenceBadge';
@@ -42,6 +42,49 @@ export function RefusalCard({ answer, onRephrase, onAskHuman, onAskAnotherDomain
           </div>
         </div>
       </div>
+
+      {/*
+        نتيجة بحث الويب الاحتياطى (Tier 2 — WebSearchFallbackService فى backend).
+        تظهر فقط عند وجودها فعلياً (refused يبقى true دائماً بغض النظر — هذا
+        القسم إضافى بجانب بطاقة الرفض أعلاه، وليس بديلاً عنها). answer.answer
+        هنا يتضمن دائماً تنويهاً إلزامياً مُلحَقاً من backend، لذلك لا نضيف
+        تنويهاً مكرراً هنا.
+      */}
+      {answer.web_fallback ? (
+        <section
+          aria-label="نتيجة بحث ويب احتياطية غير موثَّقة"
+          className="rounded-lg border border-warning/40 bg-surface p-5"
+        >
+          <div className="flex items-center gap-2">
+            <Search className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+            <h4 className="text-h4 font-semibold text-text-primary">
+              نتيجة بحث تلقائى فى مصادر رسمية عامة
+            </h4>
+          </div>
+
+          <p className="mt-3 whitespace-pre-line text-body text-text-primary">
+            {answer.web_fallback.answer}
+          </p>
+
+          {answer.web_fallback.sources.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              <p className="text-body-sm font-medium text-text-secondary">المصادر:</p>
+              {answer.web_fallback.sources.map((source, index) => (
+                <a
+                  key={`${source.url}-${index}`}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-body-sm font-medium text-link underline decoration-link underline-offset-4 hover:text-primary-hover focus-visible:outline-none"
+                >
+                  {source.title}
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div aria-label="خطوات تالية" className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={onRephrase}>
