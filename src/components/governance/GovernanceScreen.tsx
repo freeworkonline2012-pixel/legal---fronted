@@ -31,7 +31,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, RefreshCw, ScrollText, ShieldCheck, WifiOff } from 'lucide-react';
-import type { GovernanceAssessResponse, GovernanceLegalBasis } from '@/lib/types';
+import type { GovernanceAssessResponse } from '@/lib/types';
 import { ApiError, postGovernanceAssess } from '@/lib/api-client';
 import { TextArea } from '@/components/ui/TextArea';
 import { Button } from '@/components/ui/Button';
@@ -39,7 +39,7 @@ import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
 import { GovernanceVerdictBadge } from '@/components/ui/GovernanceVerdictBadge';
-import { GovernanceCitationCard } from './GovernanceCitationCard';
+import { GovernanceLawCitationGroupCard } from './GovernanceLawCitationGroupCard';
 import { GovernanceRecommendationCard } from './GovernanceRecommendationCard';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
@@ -55,31 +55,58 @@ const GOVERNANCE_PROGRESS_STEPS = [
 const MAX_PROGRESS_INDEX = GOVERNANCE_PROGRESS_STEPS.length - 1;
 const PROGRESS_TICK_MS = 1400;
 
+export interface CitedLawGroup {
+  law: string;
+  lawNo: number;
+  lawYear: number;
+  officialUrl: string | null;
+  articles: Array<{ articleNo: number; snippet: string }>;
+}
+
 /**
  * تجميع كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن وُجدت) فى
- * قائمة واحدة مرتبة تصاعدياً برقم المادة (رقم القانون فاصل تعادل ثانوى) —
- * بطلب صريح من صاحب المشروع بتاريخ 2026-09-18 («وضع كل المواد المستشهد بها
- * بالترتيب»)، بدل تفرقها سابقاً بين قسمين (الأساس القانونى أعلى الصفحة،
- * ومادة العقوبة داخل بطاقة التوصية أسفلها).
+ * قسم واحد لكل قانون — بطلب صريح ثانٍ من صاحب المشروع بتاريخ 2026-09-18:
+ * «ترتيب القوانين، وضع مواد القانون الواحد فى رسالة واحدة». قبل هذا كانت كل
+ * مادة تُعرض ببطاقة GovernanceCitationCard منفصلة تماماً حتى لو كانت مادتان
+ * من نفس القانون (راجع buildCitedArticles السابقة فى تاريخ الملف — استُبدلت
+ * بهذه الدالة).
  *
  * إزالة التكرار: applicable_penalties قد يحمل نفس المادة الموجودة بالفعل فى
  * legal_basis (نادر لكن ممكن منطقياً — المادة المخالَفة قد تكون هى نفسها
  * مادة العقوبة فى نص قانونى واحد) — نُعرِّف التطابق بـ(law_no + article_no)
- * ونُبقى على أول ظهور فقط.
+ * ونُبقى على أول ظهور فقط، قبل التجميع.
+ *
+ * الترتيب: المواد داخل كل قانون تصاعدياً برقم المادة، والقوانين نفسها
+ * تصاعدياً برقم القانون (law_no) — أبسط ترتيب مستقر وقابل للتفسير لطلب «ترتيب
+ * القوانين» المُطلَق بلا معيار محدَّد صراحة؛ يمكن تغييره لاحقاً بقرار عمل
+ * أوضح (مثلاً حسب أهمية القانون أو ترتيب وروده فى الاستجابة) إن لزم.
  */
-function buildCitedArticles(result: GovernanceAssessResponse | null): GovernanceLegalBasis[] {
+function buildCitedLawGroups(result: GovernanceAssessResponse | null): CitedLawGroup[] {
   if (!result) return [];
   const combined = [...result.legal_basis, ...(result.recommendation?.applicable_penalties ?? [])];
 
-  const seen = new Set<string>();
-  const deduped = combined.filter((basis) => {
-    const key = `${basis.law_no}-${basis.article_no}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const seenArticles = new Set<string>();
+  const groupsByKey = new Map<string, CitedLawGroup>();
 
-  return deduped.sort((a, b) => a.article_no - b.article_no || a.law_no - b.law_no);
+  for (const basis of combined) {
+    const articleKey = `${basis.law_no}-${basis.article_no}`;
+    if (seenArticles.has(articleKey)) continue;
+    seenArticles.add(articleKey);
+
+    const groupKey = `${basis.law_no}-${basis.law_year}`;
+    let group = groupsByKey.get(groupKey);
+    if (!group) {
+      group = { law: basis.law, lawNo: basis.law_no, lawYear: basis.law_year, officialUrl: basis.official_url, articles: [] };
+      groupsByKey.set(groupKey, group);
+    }
+    group.articles.push({ articleNo: basis.article_no, snippet: basis.snippet });
+  }
+
+  const groups = Array.from(groupsByKey.values());
+  for (const group of groups) {
+    group.articles.sort((a, b) => a.articleNo - b.articleNo);
+  }
+  return groups.sort((a, b) => a.lawNo - b.lawNo || a.lawYear - b.lawYear);
 }
 
 export function GovernanceScreen() {
@@ -89,7 +116,7 @@ export function GovernanceScreen() {
   const [result, setResult] = useState<GovernanceAssessResponse | null>(null);
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const citedArticles = useMemo(() => buildCitedArticles(result), [result]);
+  const citedLawGroups = useMemo(() => buildCitedLawGroups(result), [result]);
 
   function validate(value: string): string | undefined {
     const trimmed = value.trim();
@@ -231,37 +258,48 @@ export function GovernanceScreen() {
 
         {status === 'done' && result ? (
           <div className="space-y-4">
-            {/* 1. الرد — الحكم وملاحظة المخاطر */}
-            <div className="rounded-lg border border-border-default bg-surface p-5">
-              <GovernanceVerdictBadge verdict={result.verdict} />
-
-              <div className="mt-4 flex items-start gap-2 border-t border-border-default pt-4">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
-                <p className="text-body-sm text-text-secondary">{result.risk_note}</p>
-              </div>
-            </div>
-
-            {/* 2. التوصية، و3. العقوبة (نصاً فقط — بطاقة الاستشهاد بمادتها
-                انتقلت لقسم «المواد المستشهد بها» الموحَّد أدناه) — إعادة
-                ترتيب بطلب صريح من صاحب المشروع بتاريخ 2026-09-18. راجع تعليق
-                GovernanceRecommendationCard لتفاصيل اكتشاف فجوة غياب هذا
-                القسم أصلاً. recommendation غائب فى استجابات قديمة (اختيارى
-                ?:) وnull فى حالة نادرة موثَّقة فى backend — كلاهما لا يُعرض
-                شيئاً هنا، بلا أى خطأ أو نص بديل، لأن غيابه متوقَّع ومقصود. */}
+            {/* 1+2+3. الرد والتوصية والعقوبة مدموجة فى بطاقة واحدة — بطلب
+                صريح من صاحب المشروع بتاريخ 2026-09-18: «دمج الرد مع التوصية».
+                عند توفر recommendation: بطاقة واحدة تعرض شارتى الحكم والتوصية
+                معاً (مثال الطلب: «غير متوافق وغير موصى به») مع شرح واحد فقط
+                (راجع تعليق GovernanceRecommendationCard لسبب إسقاط risk_note
+                فى هذه الحالة تحديداً — كان يُكرِّر نفس نص reasoning حرفياً).
+                عند غياب recommendation (استجابات قديمة قبل 2026-09-18، أو
+                حكم "معلومات غير كافية" الذى لا توصية له أصلاً): تبقى بطاقة
+                الحكم القديمة بمفردها مع risk_note كما كانت — لا نص توصية
+                بديل موجود أصلاً فى تلك الحالة. */}
             {result.recommendation ? (
-              <GovernanceRecommendationCard recommendation={result.recommendation} />
-            ) : null}
+              <GovernanceRecommendationCard verdict={result.verdict} recommendation={result.recommendation} />
+            ) : (
+              <div className="rounded-lg border border-border-default bg-surface p-5">
+                <GovernanceVerdictBadge verdict={result.verdict} />
+
+                <div className="mt-4 flex items-start gap-2 border-t border-border-default pt-4">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+                  <p className="text-body-sm text-text-secondary">{result.risk_note}</p>
+                </div>
+              </div>
+            )}
 
             {/* 4. كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن
-                وُجدت) فى قسم واحد موحَّد، مرتبة تصاعدياً برقم المادة — بدل
-                تفرقها سابقاً بين قسمين منفصلين (الأساس القانونى أعلى الصفحة،
-                والعقوبة داخل بطاقة التوصية). راجع buildCitedArticles أسفل
-                الملف للترتيب والدمج بلا تكرار. */}
-            {citedArticles.length > 0 ? (
+                وُجدت) مُجمَّعة فى بطاقة واحدة لكل قانون (لا لكل مادة) —
+                بطلب صريح من صاحب المشروع بتاريخ 2026-09-18: «ترتيب القوانين،
+                وضع مواد القانون الواحد فى رسالة واحدة مع اتاحة الاطلاع على
+                تلك المواد وكذلك الاطلاع على القانون». راجع buildCitedLawGroups
+                أعلى الملف للتجميع والترتيب والدمج بلا تكرار، وتعليق
+                GovernanceLawCitationGroupCard لتفاصيل التصميم. */}
+            {citedLawGroups.length > 0 ? (
               <div className="space-y-3">
                 <p className="text-body-sm font-semibold text-text-primary">المواد المستشهد بها</p>
-                {citedArticles.map((basis, index) => (
-                  <GovernanceCitationCard key={`${basis.law_no}-${basis.article_no}-${index}`} basis={basis} />
+                {citedLawGroups.map((group) => (
+                  <GovernanceLawCitationGroupCard
+                    key={`${group.lawNo}-${group.lawYear}`}
+                    law={group.law}
+                    lawNo={group.lawNo}
+                    lawYear={group.lawYear}
+                    officialUrl={group.officialUrl}
+                    articles={group.articles}
+                  />
                 ))}
               </div>
             ) : (
