@@ -1,5 +1,6 @@
 /**
- * مكوّن GovernanceRecommendationCard — طبقة النصيحة لحكم الحوكمة.
+ * مكوّن GovernanceRecommendationCard — بطاقة الحكم + التوصية المدموجة لحكم
+ * الحوكمة.
  *
  * ⚠️ أُضيف 2026-09-18 — يعرض حقل `recommendation` الذى كان موجوداً فى عقد
  * backend منذ إضافته (نفس اليوم) لكن لم تُحدَّث له أى واجهة قط: اكتُشفت هذه
@@ -11,21 +12,36 @@
  * penalty_note/basis_type disclaimer/web_sources — كل حقول
  * GovernanceRecommendationDto التى كانت غير مرئية.
  *
- * ⚠️ تعديل هيكلى 2026-09-18 (بطلب صريح من صاحب المشروع، دفعة إعادة ترتيب
- * الواجهة): بطاقات استشهاد applicable_penalties (GovernanceCitationCard)
- * لم تعد تُعرض هنا — انتقلت لقسم «المواد المستشهد بها» الموحَّد فى
- * GovernanceScreen (مدموجة مع legal_basis، مرتبة تصاعدياً برقم المادة، بلا
- * تكرار). هذا المكوّن يعرض الآن فقط نص العقوبة (penalty_note) كملاحظة —
- * الاستشهاد بمادتها الفعلية أصبح جزءاً من القائمة الموحَّدة أسفل الصفحة.
- * كذلك أُضيفت شارة «موثوق/غير موثوق» بجانب شارة التوصية، مشتقة من
- * basis_type: 'database' → موثوق (مبنية على قاعدتنا القانونية المُراجَعة)،
- * 'web_supplementary' → غير موثوق (تكميلية من بحث ويب عام، غير مُراجَعة).
- * التنويه النصى الكامل لحالة web_supplementary (disclaimer) ظل موجوداً كما
- * هو — الشارة إضافة للمسح البصرى السريع، وليست بديلاً عن التنويه القانونى.
+ * ⚠️ تعديل هيكلى أول 2026-09-18 (دفعة إعادة ترتيب الواجهة): بطاقات استشهاد
+ * applicable_penalties (GovernanceCitationCard) لم تعد تُعرض هنا — انتقلت
+ * لقسم موحَّد فى GovernanceScreen. هذا المكوّن يعرض فقط نص العقوبة
+ * (penalty_note) كملاحظة. كذلك أُضيفت شارة «موثوق/غير موثوق» بجانب شارة
+ * التوصية، مشتقة من basis_type: 'database' → موثوق، 'web_supplementary' →
+ * غير موثوق. التنويه النصى الكامل لحالة web_supplementary (disclaimer) ظل
+ * موجوداً كما هو.
+ *
+ * ⚠️ تعديل هيكلى ثانٍ 2026-09-18 (بطلب صريح من صاحب المشروع: «دمج الرد مع
+ * التوصية بحيث يكون الرد على المستخدم... غير متوافق وغير موصى به مع الشرح»):
+ * هذا المكوّن أصبح يستقبل `verdict` أيضاً ويعرض شارتى الحكم والتوصية معاً فى
+ * صف واحد («غير متوافق» و«غير موصى به»)، بدل بطاقتين منفصلتين (بطاقة حكم
+ * قائمة بذاتها فى GovernanceScreen + هذه البطاقة). السبب العملى الأهم: عند
+ * توفر recommendation، لوحظ حياً أن `result.risk_note` (نص عام تحت شارة
+ * الحكم) و`recommendation.reasoning` (نص تحت شارة التوصية) يحملان نفس
+ * الشرح القانونى المفصَّل حرفياً — عرضهما منفصلين كان يُكرِّر نفس الفقرة
+ * الطويلة مرتين على الصفحة. الحل: عند دمج البطاقتين (أى كلما توفَّر
+ * recommendation)، يُعرَض reasoning فقط كشرح وحيد، ويُسقَط risk_note عمداً
+ * هنا لتفادى هذا التكرار — GovernanceScreen ما زال يعرض risk_note بمفرده
+ * فى حالة عدم توفر recommendation (استجابات قديمة أو حكم "معلومات غير
+ * كافية")، حيث لا يوجد نص توصية بديل أصلاً. الجملة القصيرة النمطية التى
+ * كانت تعرضها GovernanceVerdictBadge (VERDICT_DESCRIPTIONS، مثل "الإجراء
+ * المذكور يخالف النص القانونى المسترجَع صراحة.") أيضاً أُسقِطت من الحالة
+ * المدموجة تحديداً لنفس السبب — reasoning التفصيلى يجعلها حشواً زائداً
+ * مباشرة فوقه. GovernanceVerdictBadge نفسه لم يُعدَّل ولم يُحذَف — يبقى
+ * مستخدَماً كما هو فى GovernanceScreen لحالة عدم توفر recommendation.
  *
  * قرارات تصميم متعمَّدة (لم تتغيّر):
  * - violated_provisions لا يُعرض كقسم منفصل: نفس عناصر legal_basis المعروضة
- *   بالفعل ضمن قسم «المواد المستشهد بها» — عرضه ثانية تكرار بصرى بلا قيمة
+ *   بالفعل ضمن قسم الاستشهادات الموحَّد — عرضه ثانية تكرار بصرى بلا قيمة
  *   إضافية (راجع تعليق الحقل فى types.ts).
  * - recommendation.confidence (رقم خام 0-1) لا يُعرض مباشرة — نفس فلسفة
  *   GovernanceAssessResponse.confidence الأساسى (تعليق backend: "لا تُعرض
@@ -34,11 +50,23 @@
 
 'use client';
 
-import { AlertOctagon, CircleCheck, CircleX, ExternalLink, Gavel, Globe, ShieldCheck, ShieldX, TriangleAlert } from 'lucide-react';
+import {
+  AlertOctagon,
+  CircleCheck,
+  CircleHelp,
+  CircleX,
+  ExternalLink,
+  Gavel,
+  Globe,
+  ShieldCheck,
+  ShieldX,
+  TriangleAlert,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { GovernanceRecommendation } from '@/lib/types';
+import type { GovernanceRecommendation, GovernanceVerdict } from '@/lib/types';
 
 export interface GovernanceRecommendationCardProps {
+  verdict: GovernanceVerdict;
   recommendation: GovernanceRecommendation;
 }
 
@@ -56,8 +84,27 @@ const ADVICE_COLOR_CLASSES: Record<Advice, string> = {
   'موصى به بشرط': 'bg-warning-soft text-warning border-warning',
 };
 
-export function GovernanceRecommendationCard({ recommendation }: GovernanceRecommendationCardProps) {
-  const Icon = ADVICE_ICONS[recommendation.advice];
+/** مطابقة لـVERDICT_ICONS/VERDICT_COLOR_CLASSES فى GovernanceVerdictBadge —
+ * مكرَّرة محلياً عمداً بدل استيراد تلك الخرائط (غير مُصدَّرة من ذلك الملف)،
+ * لتفادى تغيير الواجهة العامة لمكوّن مستخدَم أيضاً بمفرده فى حالة عدم توفر
+ * recommendation. */
+const VERDICT_ICONS: Record<GovernanceVerdict, LucideIcon> = {
+  'متوافق': CircleCheck,
+  'غير متوافق': CircleX,
+  'متوافق جزئياً': TriangleAlert,
+  'معلومات غير كافية': CircleHelp,
+};
+
+const VERDICT_COLOR_CLASSES: Record<GovernanceVerdict, string> = {
+  'متوافق': 'bg-success-soft text-success border-success',
+  'غير متوافق': 'bg-error-soft text-error border-error',
+  'متوافق جزئياً': 'bg-warning-soft text-warning border-warning',
+  'معلومات غير كافية': 'bg-primary-soft text-primary border-primary-border',
+};
+
+export function GovernanceRecommendationCard({ verdict, recommendation }: GovernanceRecommendationCardProps) {
+  const VerdictIcon = VERDICT_ICONS[verdict];
+  const AdviceIcon = ADVICE_ICONS[recommendation.advice];
   const hasConditions = (recommendation.conditions_for_compliance?.length ?? 0) > 0;
   const hasWebSources = (recommendation.web_sources?.length ?? 0) > 0;
   const isWebSupplementary = recommendation.basis_type === 'web_supplementary';
@@ -71,15 +118,28 @@ export function GovernanceRecommendationCard({ recommendation }: GovernanceRecom
     : 'bg-success-soft text-success border-success';
 
   return (
-    <section aria-label="بطاقة التوصية" className="space-y-4">
+    <section aria-label="بطاقة الحكم والتوصية" className="space-y-4">
       <div className="rounded-lg border border-border-default bg-surface p-5">
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            role="status"
+            aria-label={`الحكم: ${verdict}`}
+            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${VERDICT_COLOR_CLASSES[verdict]}`}
+          >
+            <VerdictIcon className="h-4 w-4" aria-hidden="true" />
+            <span>{verdict}</span>
+          </span>
+
+          <span className="text-body-sm font-semibold text-text-tertiary" aria-hidden="true">
+            و
+          </span>
+
           <span
             role="status"
             aria-label={`التوصية: ${recommendation.advice}`}
             className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${ADVICE_COLOR_CLASSES[recommendation.advice]}`}
           >
-            <Icon className="h-4 w-4" aria-hidden="true" />
+            <AdviceIcon className="h-4 w-4" aria-hidden="true" />
             <span>{recommendation.advice}</span>
           </span>
 
