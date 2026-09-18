@@ -391,6 +391,36 @@ export interface GovernanceAssessRequest {
   action_description: string;
 }
 
+/** مصدر ويب فردى ضمن طبقة النصيحة التكميلية — يطابق GovernanceWebSourceDto حرفياً */
+export interface GovernanceWebSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/**
+ * طبقة النصيحة (أُضيفت فى backend بتاريخ 2026-09-18) — يطابق
+ * GovernanceRecommendationDto حرفياً. ⚠️ أُضيفت هنا فى الواجهة بتاريخ لاحق
+ * (2026-09-18 أيضاً، لكن بعد اكتشاف أن الواجهة — المبنية أصلاً 2026-09-05 —
+ * لم تُحدَّث قط لعرض هذا الحقل رغم وجوده فى عقد backend منذ إضافته؛ راجع
+ * "تقرير-إغلاق-فجوة-استشهاد-العقوبة..." فى توثيق المشروع لتفاصيل الاكتشاف).
+ */
+export interface GovernanceRecommendation {
+  advice: 'موصى به' | 'غير موصى به' | 'موصى به بشرط';
+  reasoning: string;
+  basis_type: 'database' | 'web_supplementary';
+  /** ثقة التوصية — نفس فلسفة GovernanceAssessResponse.confidence، لا تُعرض كرقم خام للمستخدم مباشرة */
+  confidence: number;
+  conditions_for_compliance: string[] | null;
+  /** نفس عناصر legal_basis أعلاه، مكرَّرة صراحةً فى عقد backend — لا تُعرض كقسم UI منفصل هنا لتفادى تكرار بصرى لنفس البطاقات */
+  violated_provisions: GovernanceLegalBasis[] | null;
+  web_sources: GovernanceWebSource[] | null;
+  disclaimer: string | null;
+  /** مادة (مواد) العقوبة المنطبقة تحديداً — null لا يعنى عدم وجود عقوبة أصلاً، فقط أن النظام لم يحدد واحدة بثقة كافية آلياً */
+  applicable_penalties: GovernanceLegalBasis[] | null;
+  penalty_note: string | null;
+}
+
 /** رد POST /api/governance/assess — يطابق GovernanceVerdictResponseDto */
 export interface GovernanceAssessResponse {
   verdict: GovernanceVerdict;
@@ -398,6 +428,12 @@ export interface GovernanceAssessResponse {
   risk_note: string;
   /** ثقة داخلية اختيارية — لا تُعرض كضمان دقة للمستخدم مباشرة (نفس تعليق backend) */
   confidence?: number;
+  /**
+   * طبقة النصيحة — غائبة فى استجابات قديمة قبل 2026-09-18 (لذا اختيارية
+   * `?:` لا `| null` وحدها)، وnull صراحة فى حالة نادرة موثَّقة فى backend
+   * (verdict="معلومات غير كافية" بلا نجاح بحث ويب تكميلى).
+   */
+  recommendation?: GovernanceRecommendation | null;
 }
 
 /* ------------------------------------------------------------------------ */
