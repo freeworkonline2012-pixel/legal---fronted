@@ -52,16 +52,26 @@ describe('GovernanceRecommendationCard', () => {
     expect(screen.getByText(DATABASE_RECOMMENDATION.reasoning)).toBeInTheDocument();
   });
 
-  it('يعرض قسم العقوبة المطبَّقة وملاحظتها وبطاقة المادة عند توفر applicable_penalties', () => {
+  it('يعرض قسم العقوبة المطبَّقة وملاحظتها (بطاقة الاستشهاد بالمادة انتقلت لقسم موحَّد فى GovernanceScreen)', () => {
     render(<GovernanceRecommendationCard recommendation={DATABASE_RECOMMENDATION} />);
     expect(screen.getByText('العقوبة المطبَّقة')).toBeInTheDocument();
     expect(screen.getByText(DATABASE_RECOMMENDATION.penalty_note as string)).toBeInTheDocument();
-    expect(screen.getByText(/المادة 15/)).toBeInTheDocument();
+    // بطاقة GovernanceCitationCard (المادة 15) لم تعد تُعرض داخل هذا المكوّن — راجع GovernanceScreen.test.tsx لتغطيتها ضمن القائمة الموحَّدة.
+    expect(screen.queryByText(/المادة 15/)).not.toBeInTheDocument();
   });
 
-  it('لا يعرض قسم العقوبة إطلاقاً عندما applicable_penalties=null', () => {
+  it('لا يعرض قسم العقوبة إطلاقاً عندما applicable_penalties=null وpenalty_note=null معاً', () => {
     render(<GovernanceRecommendationCard recommendation={CONDITIONAL_RECOMMENDATION} />);
     expect(screen.queryByText('العقوبة المطبَّقة')).not.toBeInTheDocument();
+  });
+
+  it('يعرض شارة «موثوق» عندما basis_type="database" وشارة «غير موثوق» عندما basis_type="web_supplementary"', () => {
+    const { rerender } = render(<GovernanceRecommendationCard recommendation={DATABASE_RECOMMENDATION} />);
+    expect(screen.getByRole('status', { name: 'مصدر التوصية: موثوق' })).toBeInTheDocument();
+
+    rerender(<GovernanceRecommendationCard recommendation={WEB_SUPPLEMENTARY_RECOMMENDATION} />);
+    expect(screen.getByRole('status', { name: 'مصدر التوصية: غير موثوق' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'مصدر التوصية: موثوق' })).not.toBeInTheDocument();
   });
 
   it('يعرض قائمة الشروط عند "موصى به بشرط"', () => {

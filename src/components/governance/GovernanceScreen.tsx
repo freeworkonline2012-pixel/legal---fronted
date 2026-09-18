@@ -29,9 +29,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, RefreshCw, ScrollText, ShieldCheck, WifiOff } from 'lucide-react';
-import type { GovernanceAssessResponse } from '@/lib/types';
+import type { GovernanceAssessResponse, GovernanceLegalBasis } from '@/lib/types';
 import { ApiError, postGovernanceAssess } from '@/lib/api-client';
 import { TextArea } from '@/components/ui/TextArea';
 import { Button } from '@/components/ui/Button';
@@ -55,6 +55,33 @@ const GOVERNANCE_PROGRESS_STEPS = [
 const MAX_PROGRESS_INDEX = GOVERNANCE_PROGRESS_STEPS.length - 1;
 const PROGRESS_TICK_MS = 1400;
 
+/**
+ * تجميع كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن وُجدت) فى
+ * قائمة واحدة مرتبة تصاعدياً برقم المادة (رقم القانون فاصل تعادل ثانوى) —
+ * بطلب صريح من صاحب المشروع بتاريخ 2026-09-18 («وضع كل المواد المستشهد بها
+ * بالترتيب»)، بدل تفرقها سابقاً بين قسمين (الأساس القانونى أعلى الصفحة،
+ * ومادة العقوبة داخل بطاقة التوصية أسفلها).
+ *
+ * إزالة التكرار: applicable_penalties قد يحمل نفس المادة الموجودة بالفعل فى
+ * legal_basis (نادر لكن ممكن منطقياً — المادة المخالَفة قد تكون هى نفسها
+ * مادة العقوبة فى نص قانونى واحد) — نُعرِّف التطابق بـ(law_no + article_no)
+ * ونُبقى على أول ظهور فقط.
+ */
+function buildCitedArticles(result: GovernanceAssessResponse | null): GovernanceLegalBasis[] {
+  if (!result) return [];
+  const combined = [...result.legal_basis, ...(result.recommendation?.applicable_penalties ?? [])];
+
+  const seen = new Set<string>();
+  const deduped = combined.filter((basis) => {
+    const key = `${basis.law_no}-${basis.article_no}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return deduped.sort((a, b) => a.article_no - b.article_no || a.law_no - b.law_no);
+}
+
 export function GovernanceScreen() {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ScreenStatus>('idle');
@@ -62,6 +89,7 @@ export function GovernanceScreen() {
   const [result, setResult] = useState<GovernanceAssessResponse | null>(null);
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const citedArticles = useMemo(() => buildCitedArticles(result), [result]);
 
   function validate(value: string): string | undefined {
     const trimmed = value.trim();
@@ -132,31 +160,25 @@ export function GovernanceScreen() {
       </div>
 
       {/* تنبيه دائم غير قابل للطى — عمداً، بخلاف DisclaimerBanner القابل للطى
-          أدناه. راجع تعليق أعلى الملف قبل إزالته أو إعادة نصه لصيغته القديمة. */}
+          أدناه. راجع تعليق أعلى الملف قبل إزالته أو إعادة نصه لصيغته القديمة.
+          ⚠️ اختُصر النص عمداً بطلب صريح من صاحب المشروع بتاريخ 2026-09-18 إلى
+          سطر واحد فقط. النص الأطول السابق كان يحمل فقرتين: (أ) منهجية القياس
+          (97.2% / 35 من 36)، و(ب) تنويه "حدود معروفة فى نطاق التغطية" الخاص
+          باستبعاد قرار 205/2021 وقرار 951/2003 من الفهرسة — وهو تنويه كان قد
+          أُضيف عمداً لأسباب قانونية/امتثال (راجع تاريخ المشروع). كلا الفقرتين
+          حُذفتا بالكامل من هذه الصفحة ولا تظهران فى أى مكان آخر — DisclaimerBanner
+          أسفل الصفحة نص عام مختلف تماماً (P7 "ليس استشارة قانونية") ولا يذكر
+          205/2021 أو 951/2003 إطلاقاً. هذا قرار عمل صريح من صاحب المشروع
+          بتحمّل مخاطرة إخفاء هذا التنويه القانونى، وليس تبسيطاً تقنياً من
+          تلقاء نفسى — لا تُعِد الفقرتين دون قرار عمل صريح جديد. */}
       <div
         role="alert"
         className="mb-6 flex items-start gap-3 rounded-lg border border-warning bg-warning-soft px-4 py-3"
       >
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-        <div>
-          <p className="text-body-sm font-semibold text-text-primary">
-            دقة مقاسة ومؤكَّدة: 97.2% — يبقى التحقق البشرى ضرورياً
-          </p>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            نتائج هذا التحقق مبنية على تحليل آلى لنصوص الحوكمة والالتزام المفهرَسة، بدقة قياسية
-            مؤكَّدة 97.2% (35 من 36 حالة اختبار مرجعية، آخر قياس نظيف بتاريخ 2026-09-07). لا تعتمد
-            على النتيجة كقرار نهائى — راجع محامٍ أو مختص امتثال قبل أى إجراء فعلى، خاصة عند حكم
-            &quot;غير متوافق&quot; أو &quot;متوافق جزئياً&quot;.
-          </p>
-          <p className="mt-2 text-body-sm text-text-secondary">
-            <span className="font-semibold">حدود معروفة فى نطاق التغطية:</span> نستبعد حالياً
-            مستندين معروفين لعدم توفر نص رسمى نظيف قابل للفهرسة — قرار مجلس إدارة الهيئة العامة
-            للرقابة المالية رقم 205 لسنة 2021 (قواعد التناسب والملاءمة للوظائف التنفيذية الرئيسية
-            بشركات التأمين وإعادة التأمين)، وقرار وزير العدل رقم 951 لسنة 2003 (اللائحة التنفيذية
-            لقانون مكافحة غسل الأموال). إن كان سؤالك يخصّ أياً منهما تحديداً، لا تعتمد على غياب
-            استشهاد بهما كدليل عدم انطباق — راجع مختص امتثال مباشرة.
-          </p>
-        </div>
+        <p className="text-body-sm font-semibold text-text-primary">
+          دقة مقاسة ومؤكَّدة: 97.2% — يبقى التحقق البشرى ضرورياً
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -209,6 +231,7 @@ export function GovernanceScreen() {
 
         {status === 'done' && result ? (
           <div className="space-y-4">
+            {/* 1. الرد — الحكم وملاحظة المخاطر */}
             <div className="rounded-lg border border-border-default bg-surface p-5">
               <GovernanceVerdictBadge verdict={result.verdict} />
 
@@ -218,25 +241,35 @@ export function GovernanceScreen() {
               </div>
             </div>
 
-            {result.legal_basis.length > 0 ? (
-              result.legal_basis.map((basis, index) => (
-                <GovernanceCitationCard key={`${basis.law_no}-${basis.article_no}-${index}`} basis={basis} />
-              ))
+            {/* 2. التوصية، و3. العقوبة (نصاً فقط — بطاقة الاستشهاد بمادتها
+                انتقلت لقسم «المواد المستشهد بها» الموحَّد أدناه) — إعادة
+                ترتيب بطلب صريح من صاحب المشروع بتاريخ 2026-09-18. راجع تعليق
+                GovernanceRecommendationCard لتفاصيل اكتشاف فجوة غياب هذا
+                القسم أصلاً. recommendation غائب فى استجابات قديمة (اختيارى
+                ?:) وnull فى حالة نادرة موثَّقة فى backend — كلاهما لا يُعرض
+                شيئاً هنا، بلا أى خطأ أو نص بديل، لأن غيابه متوقَّع ومقصود. */}
+            {result.recommendation ? (
+              <GovernanceRecommendationCard recommendation={result.recommendation} />
+            ) : null}
+
+            {/* 4. كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن
+                وُجدت) فى قسم واحد موحَّد، مرتبة تصاعدياً برقم المادة — بدل
+                تفرقها سابقاً بين قسمين منفصلين (الأساس القانونى أعلى الصفحة،
+                والعقوبة داخل بطاقة التوصية). راجع buildCitedArticles أسفل
+                الملف للترتيب والدمج بلا تكرار. */}
+            {citedArticles.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-body-sm font-semibold text-text-primary">المواد المستشهد بها</p>
+                {citedArticles.map((basis, index) => (
+                  <GovernanceCitationCard key={`${basis.law_no}-${basis.article_no}-${index}`} basis={basis} />
+                ))}
+              </div>
             ) : (
               <p className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-tertiary">
                 لا يوجد أساس قانونى محدَّد لهذا الحكم — هذا متوقَّع تحديداً عند حكم
                 &quot;معلومات غير كافية&quot; (لا مادة كافية للاستشهاد بها).
               </p>
             )}
-
-            {/* طبقة التوصية + استشهاد العقوبة (2026-09-18) — راجع تعليق
-                GovernanceRecommendationCard لتفاصيل اكتشاف هذه الفجوة.
-                recommendation غائب فى استجابات قديمة (اختيارى ?:) وnull فى
-                حالة نادرة موثَّقة فى backend — كلاهما لا يُعرض شيئاً هنا،
-                بلا أى خطأ أو نص بديل، لأن غيابه متوقَّع ومقصود فى تلك الحالات. */}
-            {result.recommendation ? (
-              <GovernanceRecommendationCard recommendation={result.recommendation} />
-            ) : null}
           </div>
         ) : null}
       </div>

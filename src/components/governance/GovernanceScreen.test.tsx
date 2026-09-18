@@ -81,11 +81,19 @@ describe('GovernanceScreen', () => {
     expect(screen.getByRole('alert', { name: '' })).toHaveTextContent(/دقة مقاسة ومؤكَّدة: 97\.2%/);
   });
 
-  it('يفصح صراحة عن استبعاد قرار 205/2021 وقرار 951/2003 من نطاق التغطية', () => {
+  /**
+   * تحديث 2026-09-18 (بطلب صريح من صاحب المشروع): التنبيه الدائم اختُصر إلى
+   * سطر واحد فقط — فقرتا المنهجية وحدود التغطية (قرار 205/2021 وقرار
+   * 951/2003) حُذفتا بالكامل من هذا التنبيه ولا تظهران فى أى مكان آخر بالصفحة
+   * (راجع تعليق GovernanceScreen.tsx لتفاصيل هذا القرار وتبعاته).
+   */
+  it('يختصر التنبيه الدائم إلى سطر الدقة فقط، بلا فقرتى المنهجية وحدود التغطية', () => {
     render(<GovernanceScreen />);
     const alertBanner = screen.getByRole('alert', { name: '' });
-    expect(alertBanner).toHaveTextContent(/205 لسنة 2021/);
-    expect(alertBanner).toHaveTextContent(/951 لسنة 2003/);
+    expect(alertBanner).toHaveTextContent('دقة مقاسة ومؤكَّدة: 97.2% — يبقى التحقق البشرى ضرورياً');
+    expect(alertBanner).not.toHaveTextContent(/205 لسنة 2021/);
+    expect(alertBanner).not.toHaveTextContent(/951 لسنة 2003/);
+    expect(alertBanner).not.toHaveTextContent(/35 من 36/);
   });
 
   it('يمنع الإرسال ويعرض خطأ تحقق عند نص أقصر من 10 أحرف', async () => {
@@ -127,6 +135,58 @@ describe('GovernanceScreen', () => {
     });
     expect(screen.getByText('العقوبة المطبَّقة')).toBeInTheDocument();
     expect(screen.getByText(/يعاقب بالحبس والغرامة كل من يخالف أحكام المادتين/)).toBeInTheDocument();
+  }, 15000);
+
+  /**
+   * تحديث 2026-09-18 (بطلب صريح من صاحب المشروع): الترتيب الجديد للصفحة
+   * الرد ← التوصية ← العقوبة (نصاً، ضمن بطاقة التوصية) ← قسم واحد موحَّد
+   * «المواد المستشهد بها» يجمع legal_basis وapplicable_penalties معاً مرتبة
+   * تصاعدياً برقم المادة، بدل ظهور الأساس القانونى منفصلاً أعلى الصفحة.
+   */
+  it('يضع قسم «المواد المستشهد بها» الموحَّد بعد بطاقة التوصية، ويرتب المواد تصاعدياً (12 قبل 15)', async () => {
+    const user = userEvent.setup();
+    mockedAssess.mockResolvedValue(NON_COMPLIANT_WITH_RECOMMENDATION_RESPONSE);
+    render(<GovernanceScreen />);
+
+    await user.type(screen.getByLabelText(/وصف الإجراء أو القرار/), VALID_DESCRIPTION);
+    await user.click(screen.getByRole('button', { name: 'تحقق الآن' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('المواد المستشهد بها')).toBeInTheDocument();
+    });
+
+    const html = document.body.innerHTML;
+    const adviceIndex = html.indexOf('التوصية: غير موصى به');
+    const citedHeadingIndex = html.indexOf('المواد المستشهد بها');
+    const article12Index = html.indexOf('المادة 12'); // من legal_basis
+    const article15Index = html.indexOf('المادة 15'); // من applicable_penalties
+
+    expect(adviceIndex).toBeGreaterThan(-1);
+    expect(citedHeadingIndex).toBeGreaterThan(adviceIndex);
+    expect(article12Index).toBeGreaterThan(citedHeadingIndex);
+    expect(article15Index).toBeGreaterThan(article12Index);
+  }, 15000);
+
+  it('لا يكرر مادة تظهر فى كل من legal_basis وapplicable_penalties بنفس رقم القانون والمادة', async () => {
+    const user = userEvent.setup();
+    const DUPLICATE_ARTICLE_RESPONSE: GovernanceAssessResponse = {
+      ...NON_COMPLIANT_WITH_RECOMMENDATION_RESPONSE,
+      legal_basis: [
+        ...NON_COMPLIANT_RESPONSE.legal_basis,
+        NON_COMPLIANT_WITH_RECOMMENDATION_RESPONSE.recommendation!.applicable_penalties![0],
+      ],
+    };
+    mockedAssess.mockResolvedValue(DUPLICATE_ARTICLE_RESPONSE);
+    render(<GovernanceScreen />);
+
+    await user.type(screen.getByLabelText(/وصف الإجراء أو القرار/), VALID_DESCRIPTION);
+    await user.click(screen.getByRole('button', { name: 'تحقق الآن' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('المواد المستشهد بها')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('المادة 15')).toHaveLength(1);
   }, 15000);
 
   it('لا يعرض بطاقة التوصية إطلاقاً عندما recommendation غائب من الاستجابة (استجابات قديمة قبل 2026-09-18)', async () => {
