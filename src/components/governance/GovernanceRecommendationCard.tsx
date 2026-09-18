@@ -1,5 +1,5 @@
 /**
- * مكوّن GovernanceRecommendationCard — طبقة النصيحة + استشهاد العقوبة لحكم الحوكمة.
+ * مكوّن GovernanceRecommendationCard — طبقة النصيحة لحكم الحوكمة.
  *
  * ⚠️ أُضيف 2026-09-18 — يعرض حقل `recommendation` الذى كان موجوداً فى عقد
  * backend منذ إضافته (نفس اليوم) لكن لم تُحدَّث له أى واجهة قط: اكتُشفت هذه
@@ -11,23 +11,32 @@
  * penalty_note/basis_type disclaimer/web_sources — كل حقول
  * GovernanceRecommendationDto التى كانت غير مرئية.
  *
- * قرارات تصميم متعمَّدة:
+ * ⚠️ تعديل هيكلى 2026-09-18 (بطلب صريح من صاحب المشروع، دفعة إعادة ترتيب
+ * الواجهة): بطاقات استشهاد applicable_penalties (GovernanceCitationCard)
+ * لم تعد تُعرض هنا — انتقلت لقسم «المواد المستشهد بها» الموحَّد فى
+ * GovernanceScreen (مدموجة مع legal_basis، مرتبة تصاعدياً برقم المادة، بلا
+ * تكرار). هذا المكوّن يعرض الآن فقط نص العقوبة (penalty_note) كملاحظة —
+ * الاستشهاد بمادتها الفعلية أصبح جزءاً من القائمة الموحَّدة أسفل الصفحة.
+ * كذلك أُضيفت شارة «موثوق/غير موثوق» بجانب شارة التوصية، مشتقة من
+ * basis_type: 'database' → موثوق (مبنية على قاعدتنا القانونية المُراجَعة)،
+ * 'web_supplementary' → غير موثوق (تكميلية من بحث ويب عام، غير مُراجَعة).
+ * التنويه النصى الكامل لحالة web_supplementary (disclaimer) ظل موجوداً كما
+ * هو — الشارة إضافة للمسح البصرى السريع، وليست بديلاً عن التنويه القانونى.
+ *
+ * قرارات تصميم متعمَّدة (لم تتغيّر):
  * - violated_provisions لا يُعرض كقسم منفصل: نفس عناصر legal_basis المعروضة
- *   بالفعل كبطاقات GovernanceCitationCard أعلى هذا المكوّن — عرضه ثانية
- *   تكرار بصرى بلا قيمة إضافية (راجع تعليق الحقل فى types.ts).
+ *   بالفعل ضمن قسم «المواد المستشهد بها» — عرضه ثانية تكرار بصرى بلا قيمة
+ *   إضافية (راجع تعليق الحقل فى types.ts).
  * - recommendation.confidence (رقم خام 0-1) لا يُعرض مباشرة — نفس فلسفة
  *   GovernanceAssessResponse.confidence الأساسى (تعليق backend: "لا تُعرض
  *   كضمان دقة للمستخدم مباشرة").
- * - applicable_penalties يُعاد استخدام GovernanceCitationCard له حرفياً
- *   (نفس شكل GovernanceLegalBasis تماماً) بدل بناء بطاقة جديدة مكرَّرة.
  */
 
 'use client';
 
-import { AlertOctagon, CircleCheck, CircleX, ExternalLink, Gavel, Globe, TriangleAlert } from 'lucide-react';
+import { AlertOctagon, CircleCheck, CircleX, ExternalLink, Gavel, Globe, ShieldCheck, ShieldX, TriangleAlert } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { GovernanceRecommendation } from '@/lib/types';
-import { GovernanceCitationCard } from './GovernanceCitationCard';
 
 export interface GovernanceRecommendationCardProps {
   recommendation: GovernanceRecommendation;
@@ -49,22 +58,40 @@ const ADVICE_COLOR_CLASSES: Record<Advice, string> = {
 
 export function GovernanceRecommendationCard({ recommendation }: GovernanceRecommendationCardProps) {
   const Icon = ADVICE_ICONS[recommendation.advice];
-  const hasPenalties = (recommendation.applicable_penalties?.length ?? 0) > 0;
   const hasConditions = (recommendation.conditions_for_compliance?.length ?? 0) > 0;
   const hasWebSources = (recommendation.web_sources?.length ?? 0) > 0;
   const isWebSupplementary = recommendation.basis_type === 'web_supplementary';
+  const showPenaltySection =
+    Boolean(recommendation.penalty_note) || (recommendation.applicable_penalties?.length ?? 0) > 0;
+
+  const TrustIcon = isWebSupplementary ? ShieldX : ShieldCheck;
+  const trustLabel = isWebSupplementary ? 'غير موثوق' : 'موثوق';
+  const trustColorClasses = isWebSupplementary
+    ? 'bg-warning-soft text-warning border-warning'
+    : 'bg-success-soft text-success border-success';
 
   return (
     <section aria-label="بطاقة التوصية" className="space-y-4">
       <div className="rounded-lg border border-border-default bg-surface p-5">
-        <span
-          role="status"
-          aria-label={`التوصية: ${recommendation.advice}`}
-          className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${ADVICE_COLOR_CLASSES[recommendation.advice]}`}
-        >
-          <Icon className="h-4 w-4" aria-hidden="true" />
-          <span>{recommendation.advice}</span>
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            role="status"
+            aria-label={`التوصية: ${recommendation.advice}`}
+            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${ADVICE_COLOR_CLASSES[recommendation.advice]}`}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            <span>{recommendation.advice}</span>
+          </span>
+
+          <span
+            role="status"
+            aria-label={`مصدر التوصية: ${trustLabel}`}
+            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${trustColorClasses}`}
+          >
+            <TrustIcon className="h-4 w-4" aria-hidden="true" />
+            <span>{trustLabel}</span>
+          </span>
+        </div>
 
         <p className="mt-3 text-body text-text-primary">{recommendation.reasoning}</p>
 
@@ -115,24 +142,21 @@ export function GovernanceRecommendationCard({ recommendation }: GovernanceRecom
             </ul>
           </div>
         ) : null}
-      </div>
 
-      {hasPenalties ? (
-        <div className="space-y-3">
-          <p className="flex items-center gap-1.5 text-body-sm font-semibold text-text-primary">
-            <Gavel className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
-            العقوبة المطبَّقة
-          </p>
-          {recommendation.penalty_note ? (
-            <p className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-secondary">
-              {recommendation.penalty_note}
+        {showPenaltySection ? (
+          <div className="mt-4 border-t border-border-default pt-4">
+            <p className="flex items-center gap-1.5 text-body-sm font-semibold text-text-primary">
+              <Gavel className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+              العقوبة المطبَّقة
             </p>
-          ) : null}
-          {recommendation.applicable_penalties?.map((penalty, index) => (
-            <GovernanceCitationCard key={`penalty-${penalty.law_no}-${penalty.article_no}-${index}`} basis={penalty} />
-          ))}
-        </div>
-      ) : null}
+            {recommendation.penalty_note ? (
+              <p className="mt-2 rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-secondary">
+                {recommendation.penalty_note}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
