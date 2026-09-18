@@ -15,10 +15,15 @@
  * ⚠️ تعديل هيكلى أول 2026-09-18 (دفعة إعادة ترتيب الواجهة): بطاقات استشهاد
  * applicable_penalties (GovernanceCitationCard) لم تعد تُعرض هنا — انتقلت
  * لقسم موحَّد فى GovernanceScreen. هذا المكوّن يعرض فقط نص العقوبة
- * (penalty_note) كملاحظة. كذلك أُضيفت شارة «موثوق/غير موثوق» بجانب شارة
- * التوصية، مشتقة من basis_type: 'database' → موثوق، 'web_supplementary' →
- * غير موثوق. التنويه النصى الكامل لحالة web_supplementary (disclaimer) ظل
- * موجوداً كما هو.
+ * (penalty_note) كملاحظة. التنويه النصى الكامل لحالة web_supplementary
+ * (disclaimer) ظل موجوداً كما هو.
+ *
+ * ⚠️ إضافة ثم إزالة شارة «موثوق/غير موثوق» (كلاهما بتاريخ 2026-09-18): أُضيفت
+ * فى دفعة إعادة الترتيب الأولى (بجوار شارة التوصية، مشتقة من basis_type)
+ * بطلب صريح من صاحب المشروع، ثم طُلب إزالتها صراحة فى نفس اليوم بعد المراجعة
+ * ("اريد ازالة كلمة موثوق"). أُزيلت بالكامل — لا تُعِدها دون قرار عمل صريح
+ * جديد. basis_type نفسه ما زال يُستخدَم داخلياً (تنويه ومصادر الويب
+ * التكميلية لحالة web_supplementary لا تزالان تُعرضان كما هما).
  *
  * ⚠️ تعديل هيكلى ثانٍ 2026-09-18 (بطلب صريح من صاحب المشروع: «دمج الرد مع
  * التوصية بحيث يكون الرد على المستخدم... غير متوافق وغير موصى به مع الشرح»):
@@ -58,8 +63,6 @@ import {
   ExternalLink,
   Gavel,
   Globe,
-  ShieldCheck,
-  ShieldX,
   TriangleAlert,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -111,12 +114,6 @@ export function GovernanceRecommendationCard({ verdict, recommendation }: Govern
   const showPenaltySection =
     Boolean(recommendation.penalty_note) || (recommendation.applicable_penalties?.length ?? 0) > 0;
 
-  const TrustIcon = isWebSupplementary ? ShieldX : ShieldCheck;
-  const trustLabel = isWebSupplementary ? 'غير موثوق' : 'موثوق';
-  const trustColorClasses = isWebSupplementary
-    ? 'bg-warning-soft text-warning border-warning'
-    : 'bg-success-soft text-success border-success';
-
   return (
     <section aria-label="بطاقة الحكم والتوصية" className="space-y-4">
       <div className="rounded-lg border border-border-default bg-surface p-5">
@@ -141,15 +138,6 @@ export function GovernanceRecommendationCard({ verdict, recommendation }: Govern
           >
             <AdviceIcon className="h-4 w-4" aria-hidden="true" />
             <span>{recommendation.advice}</span>
-          </span>
-
-          <span
-            role="status"
-            aria-label={`مصدر التوصية: ${trustLabel}`}
-            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${trustColorClasses}`}
-          >
-            <TrustIcon className="h-4 w-4" aria-hidden="true" />
-            <span>{trustLabel}</span>
           </span>
         </div>
 

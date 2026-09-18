@@ -70,13 +70,18 @@ describe('GovernanceRecommendationCard', () => {
     expect(screen.queryByText('العقوبة المطبَّقة')).not.toBeInTheDocument();
   });
 
-  it('يعرض شارة «موثوق» عندما basis_type="database" وشارة «غير موثوق» عندما basis_type="web_supplementary"', () => {
+  /**
+   * تغطية إزالة 2026-09-18: شارة «موثوق/غير موثوق» أُضيفت ثم أُزيلت صراحة
+   * بطلب صريح من صاحب المشروع بنفس اليوم — راجع تعليق GovernanceRecommendationCard.
+   */
+  it('لا يعرض أى شارة «موثوق»/«غير موثوق» إطلاقاً، مهما كان basis_type', () => {
     const { rerender } = render(<GovernanceRecommendationCard verdict="غير متوافق" recommendation={DATABASE_RECOMMENDATION} />);
-    expect(screen.getByRole('status', { name: 'مصدر التوصية: موثوق' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /مصدر التوصية/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('موثوق')).not.toBeInTheDocument();
 
     rerender(<GovernanceRecommendationCard verdict="غير متوافق" recommendation={WEB_SUPPLEMENTARY_RECOMMENDATION} />);
-    expect(screen.getByRole('status', { name: 'مصدر التوصية: غير موثوق' })).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'مصدر التوصية: موثوق' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /مصدر التوصية/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('غير موثوق')).not.toBeInTheDocument();
   });
 
   it('يعرض قائمة الشروط عند "موصى به بشرط"', () => {
