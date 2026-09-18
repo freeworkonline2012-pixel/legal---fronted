@@ -40,6 +40,7 @@ import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
 import { GovernanceVerdictBadge } from '@/components/ui/GovernanceVerdictBadge';
 import { GovernanceCitationCard } from './GovernanceCitationCard';
+import { GovernanceRecommendationCard } from './GovernanceRecommendationCard';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -227,6 +228,15 @@ export function GovernanceScreen() {
                 &quot;معلومات غير كافية&quot; (لا مادة كافية للاستشهاد بها).
               </p>
             )}
+
+            {/* طبقة التوصية + استشهاد العقوبة (2026-09-18) — راجع تعليق
+                GovernanceRecommendationCard لتفاصيل اكتشاف هذه الفجوة.
+                recommendation غائب فى استجابات قديمة (اختيارى ?:) وnull فى
+                حالة نادرة موثَّقة فى backend — كلاهما لا يُعرض شيئاً هنا،
+                بلا أى خطأ أو نص بديل، لأن غيابه متوقَّع ومقصود فى تلك الحالات. */}
+            {result.recommendation ? (
+              <GovernanceRecommendationCard recommendation={result.recommendation} />
+            ) : null}
           </div>
         ) : null}
       </div>
