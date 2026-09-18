@@ -120,6 +120,46 @@ describe('GovernanceScreen', () => {
     expect(alertBanner).not.toHaveTextContent(/35 من 36/);
   });
 
+  /**
+   * تغطية نقل التنبيه 2026-09-18 (بطلب صريح ثانٍ من صاحب المشروع): التنبيه
+   * كان يظهر فوق حقل الوصف بلون تحذيرى (warning/أصفر) — انتقل الآن إلى داخل
+   * الفورم، مباشرة بعد حقل «وصف الإجراء أو القرار» وقبل زر «تحقق الآن»، وتغيّر
+   * لونه إلى الأخضر (success). هذا الاختبار يثبّت كلا الجانبين: الموضع فى
+   * DOM (بعد حقل الوصف، قبل زر الإرسال) واللون الأخضر بدل التحذيرى — بنفس
+   * نمط اختبار ترتيب بطاقات القوانين أعلاه (مقارنة مواضع النصوص فى innerHTML).
+   */
+  it('ينقل التنبيه الدائم إلى ما بعد حقل وصف الإجراء ويحوّل لونه إلى الأخضر بدل التحذيرى', () => {
+    render(<GovernanceScreen />);
+
+    const alertBanner = screen.getByRole('alert', { name: '' });
+    const textarea = screen.getByLabelText(/وصف الإجراء أو القرار/);
+    const submitButton = screen.getByRole('button', { name: 'تحقق الآن' });
+
+    const html = document.body.innerHTML;
+    const textareaIndex = html.indexOf(textarea.outerHTML);
+    const alertIndex = html.indexOf('دقة مقاسة ومؤكَّدة: 97.2%');
+    const submitButtonIndex = html.indexOf(submitButton.outerHTML);
+
+    expect(textareaIndex).toBeGreaterThan(-1);
+    expect(alertIndex).toBeGreaterThan(-1);
+    expect(submitButtonIndex).toBeGreaterThan(-1);
+    // الترتيب فى DOM: الحقل، ثم التنبيه، ثم زر الإرسال
+    expect(textareaIndex).toBeLessThan(alertIndex);
+    expect(alertIndex).toBeLessThan(submitButtonIndex);
+
+    // اللون: أخضر (success) بدل التحذيرى (warning) السابق
+    expect(alertBanner.className).toContain('border-success');
+    expect(alertBanner.className).toContain('bg-success-soft');
+    expect(alertBanner.className).not.toContain('border-warning');
+    expect(alertBanner.className).not.toContain('bg-warning-soft');
+
+    // الأيقونة أيضاً تحمل لون success بدل warning
+    const icon = alertBanner.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon?.getAttribute('class')).toContain('text-success');
+    expect(icon?.getAttribute('class')).not.toContain('text-warning');
+  });
+
   it('يمنع الإرسال ويعرض خطأ تحقق عند نص أقصر من 10 أحرف', async () => {
     const user = userEvent.setup();
     render(<GovernanceScreen />);
