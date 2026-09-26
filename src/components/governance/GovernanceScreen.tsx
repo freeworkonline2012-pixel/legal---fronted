@@ -29,7 +29,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, RefreshCw, ScrollText, ShieldCheck, WifiOff } from 'lucide-react';
 import type { GovernanceAssessResponse } from '@/lib/types';
 import { ApiError, postGovernanceAssess } from '@/lib/api-client';
@@ -39,7 +39,8 @@ import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
 import { GovernanceVerdictBadge } from '@/components/ui/GovernanceVerdictBadge';
-import { GovernanceCitationCard } from './GovernanceCitationCard';
+import { GovernanceLawCitationGroupCard } from './GovernanceLawCitationGroupCard';
+import { GovernanceRecommendationCard } from './GovernanceRecommendationCard';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -54,6 +55,60 @@ const GOVERNANCE_PROGRESS_STEPS = [
 const MAX_PROGRESS_INDEX = GOVERNANCE_PROGRESS_STEPS.length - 1;
 const PROGRESS_TICK_MS = 1400;
 
+export interface CitedLawGroup {
+  law: string;
+  lawNo: number;
+  lawYear: number;
+  officialUrl: string | null;
+  articles: Array<{ articleNo: number; snippet: string }>;
+}
+
+/**
+ * تجميع كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن وُجدت) فى
+ * قسم واحد لكل قانون — بطلب صريح ثانٍ من صاحب المشروع بتاريخ 2026-09-18:
+ * «ترتيب القوانين، وضع مواد القانون الواحد فى رسالة واحدة». قبل هذا كانت كل
+ * مادة تُعرض ببطاقة GovernanceCitationCard منفصلة تماماً حتى لو كانت مادتان
+ * من نفس القانون (راجع buildCitedArticles السابقة فى تاريخ الملف — استُبدلت
+ * بهذه الدالة).
+ *
+ * إزالة التكرار: applicable_penalties قد يحمل نفس المادة الموجودة بالفعل فى
+ * legal_basis (نادر لكن ممكن منطقياً — المادة المخالَفة قد تكون هى نفسها
+ * مادة العقوبة فى نص قانونى واحد) — نُعرِّف التطابق بـ(law_no + article_no)
+ * ونُبقى على أول ظهور فقط، قبل التجميع.
+ *
+ * الترتيب: المواد داخل كل قانون تصاعدياً برقم المادة، والقوانين نفسها
+ * تصاعدياً برقم القانون (law_no) — أبسط ترتيب مستقر وقابل للتفسير لطلب «ترتيب
+ * القوانين» المُطلَق بلا معيار محدَّد صراحة؛ يمكن تغييره لاحقاً بقرار عمل
+ * أوضح (مثلاً حسب أهمية القانون أو ترتيب وروده فى الاستجابة) إن لزم.
+ */
+function buildCitedLawGroups(result: GovernanceAssessResponse | null): CitedLawGroup[] {
+  if (!result) return [];
+  const combined = [...result.legal_basis, ...(result.recommendation?.applicable_penalties ?? [])];
+
+  const seenArticles = new Set<string>();
+  const groupsByKey = new Map<string, CitedLawGroup>();
+
+  for (const basis of combined) {
+    const articleKey = `${basis.law_no}-${basis.article_no}`;
+    if (seenArticles.has(articleKey)) continue;
+    seenArticles.add(articleKey);
+
+    const groupKey = `${basis.law_no}-${basis.law_year}`;
+    let group = groupsByKey.get(groupKey);
+    if (!group) {
+      group = { law: basis.law, lawNo: basis.law_no, lawYear: basis.law_year, officialUrl: basis.official_url, articles: [] };
+      groupsByKey.set(groupKey, group);
+    }
+    group.articles.push({ articleNo: basis.article_no, snippet: basis.snippet });
+  }
+
+  const groups = Array.from(groupsByKey.values());
+  for (const group of groups) {
+    group.articles.sort((a, b) => a.articleNo - b.articleNo);
+  }
+  return groups.sort((a, b) => a.lawNo - b.lawNo || a.lawYear - b.lawYear);
+}
+
 export function GovernanceScreen() {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ScreenStatus>('idle');
@@ -61,6 +116,7 @@ export function GovernanceScreen() {
   const [result, setResult] = useState<GovernanceAssessResponse | null>(null);
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const citedLawGroups = useMemo(() => buildCitedLawGroups(result), [result]);
 
   function validate(value: string): string | undefined {
     const trimmed = value.trim();
@@ -124,30 +180,13 @@ export function GovernanceScreen() {
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <ScrollText className="h-10 w-10 text-primary" aria-hidden="true" />
         <h1 className="text-h2 font-bold text-text-primary">تحقق من الالتزام بقواعد الحوكمة</h1>
+        {/* نص وصفى اختُصر بطلب صريح من صاحب المشروع بتاريخ 2026-09-18: حُذف
+            ذكر أمثلة النطاق (مكافحة غسل أموال/تمويل إرهاب، تأمين، تمويل غير
+            مصرفى) وأُضيفت كلمة "القانونية" قبل "المفهرَسة" للتوضيح. */}
         <p className="max-w-lg text-body text-text-secondary">
-          صف إجراءً أو قراراً تنوي اتخاذه (مكافحة غسل أموال/تمويل إرهاب، تأمين، أو تمويل غير
-          مصرفى) — نتحقق من مطابقته للنصوص المفهرَسة ونعرض حكماً موثّقاً بمصادره.
+          صف إجراءً أو قراراً تنوي اتخاذه نتحقق من مطابقته للنصوص القانونية المفهرَسة ونعرض حكماً
+          موثّقاً بمصادره.
         </p>
-      </div>
-
-      {/* تنبيه دائم غير قابل للطى — عمداً، بخلاف DisclaimerBanner القابل للطى
-          أدناه. راجع تعليق أعلى الملف قبل إزالته أو إعادة نصه لصيغته القديمة. */}
-      <div
-        role="alert"
-        className="mb-6 flex items-start gap-3 rounded-lg border border-warning bg-warning-soft px-4 py-3"
-      >
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-        <div>
-          <p className="text-body-sm font-semibold text-text-primary">
-            دقة مقاسة ومؤكَّدة: 97.2% — يبقى التحقق البشرى ضرورياً
-          </p>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            نتائج هذا التحقق مبنية على تحليل آلى لنصوص الحوكمة والالتزام المفهرَسة، بدقة قياسية
-            مؤكَّدة 97.2% (35 من 36 حالة اختبار مرجعية، آخر قياس نظيف بتاريخ 2026-09-07). لا تعتمد
-            على النتيجة كقرار نهائى — راجع محامٍ أو مختص امتثال قبل أى إجراء فعلى، خاصة عند حكم
-            &quot;غير متوافق&quot; أو &quot;متوافق جزئياً&quot;.
-          </p>
-        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -165,6 +204,34 @@ export function GovernanceScreen() {
           error={validationError}
           helper={!validationError ? `من ${MIN_LENGTH} إلى ${MAX_LENGTH} حرفاً — كلما زادت التفاصيل، زادت دقة الحكم.` : undefined}
         />
+
+        {/* تنبيه دائم غير قابل للطى — عمداً، بخلاف DisclaimerBanner القابل للطى
+            أدناه. راجع تعليق أعلى الملف قبل إزالته أو إعادة نصه لصيغته القديمة.
+            ⚠️ اختُصر النص عمداً بطلب صريح من صاحب المشروع بتاريخ 2026-09-18 إلى
+            سطر واحد فقط. النص الأطول السابق كان يحمل فقرتين: (أ) منهجية القياس
+            (97.2% / 35 من 36)، و(ب) تنويه "حدود معروفة فى نطاق التغطية" الخاص
+            باستبعاد قرار 205/2021 وقرار 951/2003 من الفهرسة — وهو تنويه كان قد
+            أُضيف عمداً لأسباب قانونية/امتثال (راجع تاريخ المشروع). كلا الفقرتين
+            حُذفتا بالكامل من هذه الصفحة ولا تظهران فى أى مكان آخر — DisclaimerBanner
+            أسفل الصفحة نص عام مختلف تماماً (P7 "ليس استشارة قانونية") ولا يذكر
+            205/2021 أو 951/2003 إطلاقاً. هذا قرار عمل صريح من صاحب المشروع
+            بتحمّل مخاطرة إخفاء هذا التنويه القانونى، وليس تبسيطاً تقنياً من
+            تلقاء نفسى — لا تُعِد الفقرتين دون قرار عمل صريح جديد.
+            ⚠️ نُقل 2026-09-18 (بطلب صريح ثانٍ) من مكانه الأصلى فوق حقل الوصف
+            إلى هنا — بعد حقل «وصف الإجراء أو القرار» مباشرة، داخل الفورم قبل
+            زر الإرسال — وتغيّر لون خلفيته من التحذيرى (warning/أصفر) إلى
+            الأخضر (success). هذا تغيير بصرى بحت (موضع + لون) لا يمسّ النص أو
+            دلالته القانونية إطلاقاً — لا يزال تنبيهاً دائماً غير قابل للطى. */}
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-success bg-success-soft px-4 py-3"
+        >
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
+          <p className="text-body-sm font-semibold text-text-primary">
+            دقة مقاسة ومؤكَّدة: 97.2% — يبقى التحقق البشرى ضرورياً
+          </p>
+        </div>
+
         <div className="flex items-center gap-3">
           <Button type="submit" loading={status === 'loading'} disabled={status === 'loading'}>
             تحقق الآن
@@ -200,19 +267,50 @@ export function GovernanceScreen() {
 
         {status === 'done' && result ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border-default bg-surface p-5">
-              <GovernanceVerdictBadge verdict={result.verdict} />
+            {/* 1+2+3. الرد والتوصية والعقوبة مدموجة فى بطاقة واحدة — بطلب
+                صريح من صاحب المشروع بتاريخ 2026-09-18: «دمج الرد مع التوصية».
+                عند توفر recommendation: بطاقة واحدة تعرض شارتى الحكم والتوصية
+                معاً (مثال الطلب: «غير متوافق وغير موصى به») مع شرح واحد فقط
+                (راجع تعليق GovernanceRecommendationCard لسبب إسقاط risk_note
+                فى هذه الحالة تحديداً — كان يُكرِّر نفس نص reasoning حرفياً).
+                عند غياب recommendation (استجابات قديمة قبل 2026-09-18، أو
+                حكم "معلومات غير كافية" الذى لا توصية له أصلاً): تبقى بطاقة
+                الحكم القديمة بمفردها مع risk_note كما كانت — لا نص توصية
+                بديل موجود أصلاً فى تلك الحالة. */}
+            {result.recommendation ? (
+              <GovernanceRecommendationCard verdict={result.verdict} recommendation={result.recommendation} />
+            ) : (
+              <div className="rounded-lg border border-border-default bg-surface p-5">
+                <GovernanceVerdictBadge verdict={result.verdict} />
 
-              <div className="mt-4 flex items-start gap-2 border-t border-border-default pt-4">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
-                <p className="text-body-sm text-text-secondary">{result.risk_note}</p>
+                <div className="mt-4 flex items-start gap-2 border-t border-border-default pt-4">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+                  <p className="text-body-sm text-text-secondary">{result.risk_note}</p>
+                </div>
               </div>
-            </div>
+            )}
 
-            {result.legal_basis.length > 0 ? (
-              result.legal_basis.map((basis, index) => (
-                <GovernanceCitationCard key={`${basis.law_no}-${basis.article_no}-${index}`} basis={basis} />
-              ))
+            {/* 4. كل المواد المستشهد بها (الأساس القانونى + مادة العقوبة إن
+                وُجدت) مُجمَّعة فى بطاقة واحدة لكل قانون (لا لكل مادة) —
+                بطلب صريح من صاحب المشروع بتاريخ 2026-09-18: «ترتيب القوانين،
+                وضع مواد القانون الواحد فى رسالة واحدة مع اتاحة الاطلاع على
+                تلك المواد وكذلك الاطلاع على القانون». راجع buildCitedLawGroups
+                أعلى الملف للتجميع والترتيب والدمج بلا تكرار، وتعليق
+                GovernanceLawCitationGroupCard لتفاصيل التصميم. */}
+            {citedLawGroups.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-body-sm font-semibold text-text-primary">المواد المستشهد بها</p>
+                {citedLawGroups.map((group) => (
+                  <GovernanceLawCitationGroupCard
+                    key={`${group.lawNo}-${group.lawYear}`}
+                    law={group.law}
+                    lawNo={group.lawNo}
+                    lawYear={group.lawYear}
+                    officialUrl={group.officialUrl}
+                    articles={group.articles}
+                  />
+                ))}
+              </div>
             ) : (
               <p className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-tertiary">
                 لا يوجد أساس قانونى محدَّد لهذا الحكم — هذا متوقَّع تحديداً عند حكم
