@@ -17,9 +17,6 @@ export type LegalStatusKey = 'active' | 'amended' | 'repealed';
  */
 export type LawStatusKey = 'in_force' | 'amended' | 'repealed';
 
-/** درجة الثقة المصنّفة — تطابق confidence في design_tokens.json */
-export type ConfidenceKey = 'high' | 'medium' | 'low';
-
 /**
  * المجالات القانونية — تُطابق DOMAIN_KEYS الفعلية فى backend
  * (src/database/entities/domain-key.ts)، المصدر الوحيد للحقيقة. تحديث 2026-08-27:
@@ -39,9 +36,6 @@ export type DomainKey =
   | 'capital_markets'
   | 'non_bank_finance'
   | 'other';
-
-/** درجة ثقة رقمية بين 0 و 1 (PRD F-06) */
-export type ConfidenceScore = number;
 
 /** بطاقة استشهاد واحدة — عقد POST /api/questions → citations[] */
 export interface Citation {
@@ -67,17 +61,44 @@ export interface Citation {
   snippet: string;
 }
 
+/** مصدر واحد فى نتيجة بحث الويب الاحتياطى (Tier 2) — WebFallbackSourceDto فى backend */
+export interface WebFallbackSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/**
+ * نتيجة طبقة البحث الاحتياطى (Tier 2) — تظهر فقط عندما refused=true وكانت
+ * خاصية ENABLE_WEB_FALLBACK مفعَّلة فى backend ووُجدت نتائج بحث ضمن نطاق
+ * مصادر رسمية مسموحة. answer يتضمن دائماً تنويهاً إلزامياً فى نهايته (يُضاف
+ * برمجياً فى backend، لا يُفترض إضافته هنا). لا تُعامَل بنفس ثقة citations —
+ * لم تُتحقَّق من قاعدة بياناتنا القانونية، لذلك تبقى refused=true ويستمر
+ * الرد فى دخول طابور المراجعة البشرية كالمعتاد (WebFallbackResponseDto فى backend).
+ */
+export interface WebFallback {
+  answer: string;
+  sources: WebFallbackSource[];
+  provider: string;
+}
+
 /** رد POST /api/questions — الحالة الطبيعية أو الرفض (refused) */
 export interface QuestionAnswerResponse {
   /** معرّف الإجابة المحفوظة — يعيده backend في AnswerResponseDto.id (عقد C-2) */
   id: string;
   /** النص المبسّط للإجابة */
   answer: string;
-  /** درجة الثقة الرقمية — < 0.60 → رفض صريح + تحويل لمراجعة بشرية */
-  confidence: ConfidenceScore;
+  // "إلغاء بادج الثقة بالكامل" (2026-09-25 — قرار صريح من رجل الأعمال، راجع
+  // تعليق AnswerResponseDto فى backend/src/questions/dto/answer-response.dto.ts
+  // للتفاصيل الكاملة): كان confidence: ConfidenceScore هنا سابقاً، أُزيل
+  // بالكامل من عقد الـAPI بعد اكتشاف أن كل نسخة جُرِّبت منه هذه الجلسة (ثقة
+  // استرجاع بحتة، ثم ثقة مركَّبة مع إشارة بوابة الهلوسة) أعطت ثقة لا تعكس
+  // اكتمال/دقة الإجابة الفعلية.
   citations: Citation[];
   /** true = رفض الإجابة لعدم كفاية النصوص الموثّقة */
   refused: boolean;
+  /** نتيجة بحث ويب احتياطى غير موثَّقة (Tier 2) — موجودة فقط عند refused=true، وإلا null/undefined */
+  web_fallback?: WebFallback | null;
 }
 
 /** طلب POST /api/questions */
@@ -98,7 +119,8 @@ export interface QuestionHistoryItem {
   category: DomainKey | null;
   /** true = رفض صريح (لا تخمين) — يطابق حقل backend `refused` (وليس status) */
   refused: boolean;
-  confidence: ConfidenceScore | null;
+  // confidence أُزيل من هنا أيضاً — راجع تعليق إلغاء بادج الثقة أعلاه فى
+  // QuestionAnswerResponse.
   created_at: string;
 }
 
@@ -368,6 +390,36 @@ export interface GovernanceAssessRequest {
   action_description: string;
 }
 
+/** مصدر ويب فردى ضمن طبقة النصيحة التكميلية — يطابق GovernanceWebSourceDto حرفياً */
+export interface GovernanceWebSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/**
+ * طبقة النصيحة (أُضيفت فى backend بتاريخ 2026-09-18) — يطابق
+ * GovernanceRecommendationDto حرفياً. ⚠️ أُضيفت هنا فى الواجهة بتاريخ لاحق
+ * (2026-09-18 أيضاً، لكن بعد اكتشاف أن الواجهة — المبنية أصلاً 2026-09-05 —
+ * لم تُحدَّث قط لعرض هذا الحقل رغم وجوده فى عقد backend منذ إضافته؛ راجع
+ * "تقرير-إغلاق-فجوة-استشهاد-العقوبة..." فى توثيق المشروع لتفاصيل الاكتشاف).
+ */
+export interface GovernanceRecommendation {
+  advice: 'موصى به' | 'غير موصى به' | 'موصى به بشرط';
+  reasoning: string;
+  basis_type: 'database' | 'web_supplementary';
+  /** ثقة التوصية — نفس فلسفة GovernanceAssessResponse.confidence، لا تُعرض كرقم خام للمستخدم مباشرة */
+  confidence: number;
+  conditions_for_compliance: string[] | null;
+  /** نفس عناصر legal_basis أعلاه، مكرَّرة صراحةً فى عقد backend — لا تُعرض كقسم UI منفصل هنا لتفادى تكرار بصرى لنفس البطاقات */
+  violated_provisions: GovernanceLegalBasis[] | null;
+  web_sources: GovernanceWebSource[] | null;
+  disclaimer: string | null;
+  /** مادة (مواد) العقوبة المنطبقة تحديداً — null لا يعنى عدم وجود عقوبة أصلاً، فقط أن النظام لم يحدد واحدة بثقة كافية آلياً */
+  applicable_penalties: GovernanceLegalBasis[] | null;
+  penalty_note: string | null;
+}
+
 /** رد POST /api/governance/assess — يطابق GovernanceVerdictResponseDto */
 export interface GovernanceAssessResponse {
   verdict: GovernanceVerdict;
@@ -375,6 +427,12 @@ export interface GovernanceAssessResponse {
   risk_note: string;
   /** ثقة داخلية اختيارية — لا تُعرض كضمان دقة للمستخدم مباشرة (نفس تعليق backend) */
   confidence?: number;
+  /**
+   * طبقة النصيحة — غائبة فى استجابات قديمة قبل 2026-09-18 (لذا اختيارية
+   * `?:` لا `| null` وحدها)، وnull صراحة فى حالة نادرة موثَّقة فى backend
+   * (verdict="معلومات غير كافية" بلا نجاح بحث ويب تكميلى).
+   */
+  recommendation?: GovernanceRecommendation | null;
 }
 
 /* ------------------------------------------------------------------------ */

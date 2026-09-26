@@ -30,7 +30,6 @@ export const DEMO_ANSWER: QuestionAnswerResponse = {
   id: 'a-demo-answer',
   answer:
     'نعم، لك حق في تعويض عن إنهاء عقد العمل دون إشعار، وفقاً للمادة 110 من قانون العمل رقم 12 لسنة 2003.',
-  confidence: 0.92,
   citations: [DEMO_CITATION],
   refused: false,
 };
@@ -39,7 +38,6 @@ export const DEMO_REFUSAL: QuestionAnswerResponse = {
   id: 'a-demo-refusal',
   answer:
     'لم نجد نصاً قانونياً كافياً وموثّقاً للإجابة بدقة — ولن نخمّن. هذا الموقف خارج نطاق المجالات المغطاة حالياً (عمل/إيجارات/أحوال شخصية/مرور/حماية مستهلك).',
-  confidence: 0.4,
   citations: [],
   refused: true,
 };
@@ -63,7 +61,6 @@ export const DEMO_HISTORY: QuestionHistoryItem[] = [
     question: 'اتنفصلت من الشغل من غير إشعار، ليا حق تعويض؟',
     category: 'labor',
     refused: false,
-    confidence: 0.92,
     created_at: '2026-08-17T10:24:00.000Z',
   },
   {
@@ -71,7 +68,6 @@ export const DEMO_HISTORY: QuestionHistoryItem[] = [
     question: 'إيه حكم الشركة اللي بتشتغل في السوشيال ميديا؟',
     category: null,
     refused: true,
-    confidence: 0.4,
     created_at: '2026-08-17T09:10:00.000Z',
   },
 ];

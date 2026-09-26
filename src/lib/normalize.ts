@@ -6,7 +6,7 @@
  *  ويُقبل إدخال أرقام شرقية (٠-٩) من المستخدم ويُطبَّع.»
  */
 
-import type { ConfidenceKey, DomainKey } from './types';
+import type { DomainKey } from './types';
 
 /** تحويل الأرقام الشرقية (٠-٩) إلى غربية (0-9) داخل النص */
 export function normalizeArabicDigits(input: string): string {
@@ -44,12 +44,9 @@ export function stripTashkeel(input: string): string {
   return input.replace(/[\u0617-\u061A\u064B-\u0652]/g, '');
 }
 
-/** تصنيف درجة الثقة الرقمية إلى مفتاح (high/medium/low) وفق عتبات design_tokens.json */
-export function getConfidenceKey(score: number): ConfidenceKey {
-  if (score >= 0.85) return 'high';
-  if (score >= 0.6) return 'medium';
-  return 'low';
-}
+// getConfidenceKey أُزيلت بالكامل (2026-09-25 — "إلغاء بادج الثقة بالكامل"،
+// قرار صريح من رجل الأعمال). راجع تعليق QuestionAnswerResponse.confidence
+// المحذوف فى types.ts للتفاصيل الكاملة.
 
 /**
  * تقدير المجال القانوني من نص السؤال — حل أمامي خفيف لعرض شريحة «المجال المحدد» (F-01).

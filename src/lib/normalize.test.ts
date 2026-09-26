@@ -1,6 +1,5 @@
 import {
   detectDomain,
-  getConfidenceKey,
   isDomainKey,
   normalizeArabicDigits,
   stripTashkeel,
@@ -24,23 +23,6 @@ describe('normalizeArabicDigits', () => {
 describe('stripTashkeel', () => {
   it('يزيل التشكيل من النص', () => {
     expect(stripTashkeel('سَارِيَة')).toBe('سارية');
-  });
-});
-
-describe('getConfidenceKey', () => {
-  it('يصنّف الثقة العالية (≥ 0.85)', () => {
-    expect(getConfidenceKey(0.92)).toBe('high');
-    expect(getConfidenceKey(0.85)).toBe('high');
-  });
-
-  it('يصنّف الثقة المتوسطة (0.60 - 0.84)', () => {
-    expect(getConfidenceKey(0.7)).toBe('medium');
-    expect(getConfidenceKey(0.6)).toBe('medium');
-  });
-
-  it('يصنّف الثقة المنخفضة (< 0.60)', () => {
-    expect(getConfidenceKey(0.4)).toBe('low');
-    expect(getConfidenceKey(0.59)).toBe('low');
   });
 });
 

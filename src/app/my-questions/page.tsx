@@ -22,9 +22,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { DomainChip } from '@/components/ui/DomainChip';
-import { ConfidenceBadge } from '@/components/ui/ConfidenceBadge';
 import { useToast } from '@/components/ui/Toast';
-import { getConfidenceKey, isDomainKey } from '@/lib/normalize';
+import { isDomainKey } from '@/lib/normalize';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -188,8 +187,6 @@ export default function MyQuestionsPage() {
                       <span className="inline-flex h-7 items-center rounded-full border border-error bg-error-soft px-3 text-body-sm font-semibold text-error">
                         تم الرفض (لا تخمين)
                       </span>
-                    ) : item.confidence !== null ? (
-                      <ConfidenceBadge level={getConfidenceKey(item.confidence)} />
                     ) : null}
                     <span className="text-caption text-text-tertiary">{formatDate(item.created_at)}</span>
                     <button

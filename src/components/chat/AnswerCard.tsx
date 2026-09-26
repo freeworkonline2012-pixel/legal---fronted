@@ -1,12 +1,16 @@
 /**
- * مكوّن AnswerCard — إجابة موثّقة بثقة عالية/متوسطة (S-04 في wireframes — P2).
+ * مكوّن AnswerCard — إجابة موثّقة بالاستشهادات (S-04 في wireframes — P2).
  *
  * هرمية العرض:
- * 1. شارة الثقة (نص + أيقونة + لون — P6).
- * 2. الإجابة المبسطة (body_lg — الأهم للشخصية 1).
- * 3. «بمعنى آخر» — فقرة مبسطة إضافية داخل surface_muted.
- * 4. بطاقات الاستشهاد (عنصر تصميمي أول — P1).
- * 5. التقييم 👍/👎 + أسئلة المتابعة المقترحة.
+ * 1. الإجابة المبسطة (body_lg — الأهم للشخصية 1).
+ * 2. «بمعنى آخر» — فقرة مبسطة إضافية داخل surface_muted.
+ * 3. بطاقات الاستشهاد (عنصر تصميمي أول — P1).
+ * 4. التقييم 👍/👎 + أسئلة المتابعة المقترحة.
+ *
+ * "إلغاء بادج الثقة بالكامل" (2026-09-25 — قرار صريح من رجل الأعمال): كانت
+ * شارة الثقة (P6) أول عنصر فى هذه الهرمية — أُزيلت كلياً بعد اكتشاف أن كل
+ * نسخة منها جُرِّبت هذه الجلسة أعطت ثقة لا تعكس اكتمال/دقة الإجابة الفعلية.
+ * راجع تعليق QuestionAnswerResponse فى lib/types.ts للتفاصيل الكاملة.
  */
 
 'use client';
@@ -15,8 +19,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import type { QuestionAnswerResponse } from '@/lib/types';
 import { postFeedback } from '@/lib/api-client';
-import { getConfidenceKey } from '@/lib/normalize';
-import { ConfidenceBadge } from '@/components/ui/ConfidenceBadge';
 import { CitationCard } from '@/components/ui/CitationCard';
 import { RatingControl } from '@/components/ui/RatingControl';
 import { Button } from '@/components/ui/Button';
@@ -37,15 +39,10 @@ export function AnswerCard({
   showPlainLanguage = true,
 }: AnswerCardProps) {
   const [plainOpen, setPlainOpen] = useState(false);
-  const level = getConfidenceKey(answer.confidence);
   const answerId = answer.id;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <ConfidenceBadge level={level} />
-      </div>
-
       <p className="text-body-lg text-text-primary">{answer.answer}</p>
 
       {showPlainLanguage ? (

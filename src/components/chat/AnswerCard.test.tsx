@@ -4,9 +4,8 @@ import { AnswerCard } from './AnswerCard';
 import { DEMO_ANSWER } from '@/lib/demo-data';
 
 describe('AnswerCard', () => {
-  it('يعرض شارة الثقة والإجابة المبسطة', () => {
+  it('يعرض الإجابة المبسطة (بادج الثقة أُلغِى بالكامل 2026-09-25)', () => {
     render(<AnswerCard answer={DEMO_ANSWER} />);
-    expect(screen.getByText('ثقة عالية')).toBeInTheDocument();
     expect(screen.getByText(DEMO_ANSWER.answer)).toBeInTheDocument();
   });
 

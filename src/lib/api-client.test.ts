@@ -46,7 +46,6 @@ function jsonResponse(body: unknown, status = 200): Response {
 const ANSWER_BODY = {
   id: 'a-1',
   answer: 'نعم، لك حق في تعويض.',
-  confidence: 0.92,
   citations: [],
   refused: false,
 };
@@ -144,7 +143,6 @@ describe('api-client', () => {
       const result = await postQuestion({ question: 'هل لي حق في تعويض؟' });
 
       expect(result.id).toBe('a-1');
-      expect(result.confidence).toBe(0.92);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/questions'),
         expect.objectContaining({
@@ -165,7 +163,6 @@ describe('api-client', () => {
               question: 'سؤال؟',
               category: 'labor',
               refused: false,
-              confidence: 0.9,
               created_at: '2026-08-17T10:00:00.000Z',
             },
           ],

@@ -10,7 +10,6 @@
 import type { DomainKey } from './types';
 
 export type LegalStatusKey = 'active' | 'amended' | 'repealed';
-export type ConfidenceKey = 'high' | 'medium' | 'low';
 // DomainKey يُستورَد الآن من types.ts بدل إعادة تعريفه هنا — كان هذا الملف
 // يحمل نسخة مكرَّرة يدوية (علّق عليها بـ"مطابقة حرفية" فقط، بلا فرض نوعى فعلى)
 // أُبقيت متزامنة بالصدفة مع insurance/aml_cft، لكنها نفس فجوة النوع (type
@@ -144,32 +143,9 @@ export const legalStatusTokens: Record<
   },
 };
 
-export const confidenceTokens: Record<
-  ConfidenceKey,
-  { label: string; icon: string; threshold: string; light: ColorToken; dark: ColorToken }
-> = {
-  high: {
-    label: 'ثقة عالية',
-    icon: 'shield-check',
-    threshold: '>= 0.85',
-    light: { fg: '#1E7A3C', bg: '#DCF3E4', border: '#2E9E54' },
-    dark: { fg: '#4CC38A', bg: '#1C3A2B', border: '#4CC38A' },
-  },
-  medium: {
-    label: 'ثقة متوسطة',
-    icon: 'shield-alert',
-    threshold: '0.60 - 0.84',
-    light: { fg: '#8A6D00', bg: '#F7EFD0', border: '#A67C00' },
-    dark: { fg: '#D4A84F', bg: '#3A3217', border: '#D4A84F' },
-  },
-  low: {
-    label: 'ثقة منخفضة',
-    icon: 'shield-x',
-    threshold: '< 0.60',
-    light: { fg: '#B3261E', bg: '#FBE3E1', border: '#B3261E' },
-    dark: { fg: '#F08A84', bg: '#3E2220', border: '#F08A84' },
-  },
-};
+// confidenceTokens أُزيل بالكامل (2026-09-25 — "إلغاء بادج الثقة بالكامل"،
+// قرار صريح من رجل الأعمال). راجع تعليق QuestionAnswerResponse.confidence
+// المحذوف فى types.ts وتعليق AnswerResponseDto فى backend للتفاصيل الكاملة.
 
 export const domainChipTokens: Record<
   DomainKey,

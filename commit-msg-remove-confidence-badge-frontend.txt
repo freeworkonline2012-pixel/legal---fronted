@@ -1,0 +1,71 @@
+إزالة كاملة لبادج/مؤشر الثقة من الواجهة الأمامية (Frontend)
+
+السبب:
+بعد تجربة ربط بادج الثقة بمخرج حارس الهلوسة (hallucination-guard) كإشارة مركّبة،
+كشف تقييم إجابة حية فعلية (تقدير 7/10 مقابل مستند مرجعي) عن خلل توليف حقيقي:
+المادتان 159 و161 كانتا مسترجعتين بنجاح (ITB) لكنهما سقطتا من نص الإجابة النهائي
+رغم توليد سليم غير مرفوض من حارس الهلوسة — أي أن الإشارة المركّبة نفسها لم تكن
+لتكتشف هذا العيب أبداً. قرار المستخدم: إلغاء بادج الثقة بالكامل من الواجهة
+والباك-إند معاً، بدلاً من الاستمرار في تكرار محاولات إصلاحه.
+
+ما تم إزالته (frontend فقط — هذا الالتزام):
+- حذف المكوّن src/components/ui/ConfidenceBadge.tsx وملف اختباره بالكامل.
+  ⚠️ يجب حذف هذين الملفين يدوياً على جهازك (git rm) — أداة النقل هذه تكتب
+  الملفات المعدَّلة فقط ولا تحذف ملفات، وقد أصبح هذا المكوّن الآن غير قابل
+  للبناء أصلاً لأنه يستورد ConfidenceKey من lib/types.ts وconfidenceTokens
+  من lib/tokens.ts، وكلاهما أُزيلا:
+    git rm src/components/ui/ConfidenceBadge.tsx
+    git rm src/components/ui/ConfidenceBadge.test.tsx
+- src/lib/types.ts: إزالة ConfidenceKey، ConfidenceScore، وحقل confidence من
+  QuestionAnswerResponse وQuestionHistoryItem.
+- src/lib/tokens.ts: إزالة ConfidenceKey المكرر وconfidenceTokens بالكامل.
+- src/lib/normalize.ts + normalize.test.ts: إزالة الدالة getConfidenceKey
+  واختباراتها الثلاثة.
+- src/components/chat/AnswerCard.tsx + .test.tsx: إزالة استدعاء البادج
+  وimports المرتبطة به؛ تحديث اختبار كان يتحقق من ظهور "ثقة عالية".
+- src/components/chat/RefusalCard.tsx + .test.tsx: نفس الإزالة؛ تحديث اختبار
+  كان يتحقق من ظهور "ثقة منخفضة".
+- src/app/my-questions/page.tsx + .test.tsx: إزالة فرع عرض البادج فى قائمة
+  السجل التاريخي وإزالة قيم confidence التجريبية من الاختبار.
+- src/lib/demo-data.ts: إزالة حقل confidence من DEMO_ANSWER وDEMO_REFUSAL
+  وDEMO_HISTORY[0]/[1].
+- src/lib/api-client.test.ts: إزالة confidence من mock الإجابة ومن اختبار
+  postQuestion، ومن mock عنصر السجل التاريخي فى fetchQuestionHistory.
+
+ما لم يُمس عمداً (مفاهيم "ثقة" منفصلة تماماً، خارج نطاق هذه الإزالة):
+- ReviewContext.confidence (قائمة انتظار المراجعة البشرية EP-06).
+- GovernanceRecommendation.confidence / GovernanceAssessResponse.confidence
+  (وحدة الحوكمة — أصلاً غير معروضة كرقم خام للمستخدم).
+- ContractClauseItem.assessment_confidence (تقييم بنود العقود).
+- DEMO_REVIEW_ITEMS[0].priority = 'low_confidence' (بيانات تجريبية لقائمة
+  المراجعة، غير مرتبطة ببادج الإجابة).
+
+التحقق المنفَّذ فى بيئة العمل السحابية قبل الشحن:
+- npm run typecheck (tsc --noEmit): نظيف، بدون أخطاء.
+- npm test (jest): فشل أولى بفشلين فقط (اختباران كانا يتحققان من نص البادج
+  القديم)، بعد الإصلاح: 233/233 اختباراً ناجحاً عبر 44 ملف اختبار.
+- npm run build (next build / Turbopack): فشل، لكن السبب فحسب هو تعذّر
+  الوصول لخطوط Google Fonts (IBM Plex Sans Arabic / Noto Naskh Arabic) بسبب
+  عدم توفر شبكة خارجية فى بيئة العمل السحابية المعزولة — وهذا قيد بيئي وليس
+  عيباً فى الكود. يُنصح بتشغيل npm run build على جهازك بعد السحب للتأكد
+  النهائي أن البناء يمر بنجاح فى بيئة لديها اتصال فعلي بـ fonts.googleapis.com.
+
+ملاحظة هامة على مسار الشحن:
+تم اكتشاف هذا المسار (frontend-git) لأول مرة فى هذه الجلسة كمسار Git صحيح
+للواجهة الأمامية (تأكد وجود .git وتطابق بنية الملفات حرفياً مع نسخة العمل).
+لم يُستخدم من قبل فى هذه الجلسة لأي عملية شحن سابقة — بعد الدفع من جهازك،
+يُرجى التأكد من أن النشر (مثلاً على Vercel) يصل فعلاً للنتيجة الصحيحة قبل
+الاعتماد الكامل على هذا المسار مستقبلاً.
+
+الخطوات المطلوبة منك على جهازك:
+1) احذف الملفين المذكورين أعلاه (git rm).
+2) راجع git status/git diff للتأكد من أن كل الملفات المعدَّلة أعلاه ظاهرة.
+3) نفّذ:
+   git add -A
+   git commit -F commit-msg-remove-confidence-badge-frontend.txt
+   git push
+4) بعد النشر، أرسل لى تأكيد النشر (رابط Vercel أو ما يعادله) للتحقق المباشر
+   بدلاً من افتراض النجاح.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EvjjtdpRK6wc7dVeQkQNnq
