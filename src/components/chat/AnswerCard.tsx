@@ -1,81 +1,61 @@
 /**
  * مكوّن AnswerCard — إجابة موثّقة بالاستشهادات (S-04 في wireframes — P2).
  *
- * هرمية العرض:
- * 1. الإجابة المبسطة (body_lg — الأهم للشخصية 1).
- * 2. «بمعنى آخر» — فقرة مبسطة إضافية داخل surface_muted.
- * 3. بطاقات الاستشهاد (عنصر تصميمي أول — P1).
- * 4. التقييم 👍/👎 + أسئلة المتابعة المقترحة.
+ * مساران للعرض:
+ * 1. إجابة منظَّمة (answer.structured صالحة) — 2026-10-05: جواب مباشر أولاً،
+ *    تنبيهات ومسائل مفتوحة، وقائع للتأكيد، أحكام موسومة «نص/تفسير» بسندها
+ *    وحالة المصدر، ثم المصادر مجمَّعة (راجع StructuredAnswerView).
+ * 2. الشكل القديم (لا structured، أو بنية غير صالحة، أو سجل قديم): الإجابة
+ *    النصية ثم بطاقات الاستشهاد — بلا أى تغيير فى سلوكه.
+ * وفى الحالتين بعدها: التقييم 👍/👎 + أسئلة المتابعة المقترحة.
  *
- * "إلغاء بادج الثقة بالكامل" (2026-09-25 — قرار صريح من رجل الأعمال): كانت
- * شارة الثقة (P6) أول عنصر فى هذه الهرمية — أُزيلت كلياً بعد اكتشاف أن كل
- * نسخة منها جُرِّبت هذه الجلسة أعطت ثقة لا تعكس اكتمال/دقة الإجابة الفعلية.
- * راجع تعليق QuestionAnswerResponse فى lib/types.ts للتفاصيل الكاملة.
+ * إزالة قسم «بمعنى آخر» (2026-10-05): كان نصاً ثابتاً مكتوباً يدوياً عن «إنهاء
+ * العقد دون سبب أو إشعار» يظهر تحت **كل** إجابة أياً كان سؤالها (إيجار، مرور،
+ * أحوال شخصية…) — شرح غير مرتبط بالسؤال وقد يضلّل. لا يُعاد إلا بتوليد حقيقى
+ * من الخادم لكل إجابة على حدة.
+ *
+ * "إلغاء بادج الثقة بالكامل" (2026-09-25 — قرار صريح من رجل الأعمال): شارة
+ * الثقة أُزيلت كلياً. راجع تعليق QuestionAnswerResponse فى lib/types.ts.
  */
 
 'use client';
 
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo } from 'react';
 import type { QuestionAnswerResponse } from '@/lib/types';
 import { postFeedback } from '@/lib/api-client';
+import { parseStructuredAnswer } from '@/lib/structured-answer';
 import { CitationCard } from '@/components/ui/CitationCard';
 import { RatingControl } from '@/components/ui/RatingControl';
 import { Button } from '@/components/ui/Button';
+import { StructuredAnswerView } from './StructuredAnswerView';
 
 export interface AnswerCardProps {
   answer: QuestionAnswerResponse;
   /** أسئلة متابعة مقترحة (اختياري) */
   followUpQuestions?: ReadonlyArray<string>;
   onFollowUpClick?: (question: string) => void;
-  /** إظهار قسم «بمعنى آخر» */
-  showPlainLanguage?: boolean;
 }
 
-export function AnswerCard({
-  answer,
-  followUpQuestions = [],
-  onFollowUpClick,
-  showPlainLanguage = true,
-}: AnswerCardProps) {
-  const [plainOpen, setPlainOpen] = useState(false);
+export function AnswerCard({ answer, followUpQuestions = [], onFollowUpClick }: AnswerCardProps) {
   const answerId = answer.id;
+  const structured = useMemo(() => parseStructuredAnswer(answer.structured), [answer.structured]);
 
   return (
     <div className="space-y-4">
-      <p className="text-body-lg text-text-primary">{answer.answer}</p>
+      {structured ? (
+        <StructuredAnswerView structured={structured} citations={answer.citations} />
+      ) : (
+        <>
+          <p className="text-body-lg text-text-primary">{answer.answer}</p>
 
-      {showPlainLanguage ? (
-        <div className="rounded-md bg-surface-muted p-4">
-          <button
-            type="button"
-            aria-expanded={plainOpen}
-            onClick={() => setPlainOpen((prev) => !prev)}
-            className="inline-flex min-h-[44px] items-center gap-1 text-body-sm font-semibold text-link hover:text-primary-hover focus-visible:outline-none"
-          >
-            {plainOpen ? (
-              <ChevronUp className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            )}
-            <span>بمعنى آخر</span>
-          </button>
-          {plainOpen ? (
-            <p className="mt-1 text-body text-text-secondary">
-              بمعنى أبسط: إذا أنهى صاحب العمل عقدك دون سبب قانوني أو دون إشعار مسبق، فالقانون
-              يمنحك حق الحصول على تعويض. هذه الصياغة توضيحية مبسطة — النص الحرفي في بطاقة
-              الاستشهاد هو المرجع الدقيق.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {answer.citations.map((citation, index) => (
-        <CitationCard
-          key={`${citation.law_no}-${citation.article_no}-${index}`}
-          citation={citation}
-        />
-      ))}
+          {answer.citations.map((citation, index) => (
+            <CitationCard
+              key={`${citation.law_no}-${citation.article_no}-${index}`}
+              citation={citation}
+            />
+          ))}
+        </>
+      )}
 
       <RatingControl
         answerId={answerId}

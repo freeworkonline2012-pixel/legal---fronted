@@ -31,7 +31,7 @@
 
 import { useMemo, useState } from 'react';
 import { AlertTriangle, RefreshCw, ScrollText, ShieldCheck, WifiOff } from 'lucide-react';
-import type { GovernanceAssessResponse } from '@/lib/types';
+import type { GovernanceAssessResponse, SourceStatusLabel } from '@/lib/types';
 import { ApiError, postGovernanceAssess } from '@/lib/api-client';
 import { TextArea } from '@/components/ui/TextArea';
 import { Button } from '@/components/ui/Button';
@@ -41,6 +41,7 @@ import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
 import { GovernanceVerdictBadge } from '@/components/ui/GovernanceVerdictBadge';
 import { GovernanceLawCitationGroupCard } from './GovernanceLawCitationGroupCard';
 import { GovernanceRecommendationCard } from './GovernanceRecommendationCard';
+import { GovernancePresentationView } from './GovernancePresentationView';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -60,7 +61,7 @@ export interface CitedLawGroup {
   lawNo: number;
   lawYear: number;
   officialUrl: string | null;
-  articles: Array<{ articleNo: number; snippet: string }>;
+  articles: Array<{ articleNo: number; snippet: string; sourceStatus?: SourceStatusLabel }>;
 }
 
 /**
@@ -99,7 +100,7 @@ function buildCitedLawGroups(result: GovernanceAssessResponse | null): CitedLawG
       group = { law: basis.law, lawNo: basis.law_no, lawYear: basis.law_year, officialUrl: basis.official_url, articles: [] };
       groupsByKey.set(groupKey, group);
     }
-    group.articles.push({ articleNo: basis.article_no, snippet: basis.snippet });
+    group.articles.push({ articleNo: basis.article_no, snippet: basis.snippet, sourceStatus: basis.source_status });
   }
 
   const groups = Array.from(groupsByKey.values());
@@ -267,6 +268,12 @@ export function GovernanceScreen() {
 
         {status === 'done' && result ? (
           <div className="space-y-4">
+            {/* 0. العرض المنظَّم (2026-10-05): الجواب المباشر أولاً ثم التنبيهات
+                والمسائل المفتوحة والوقائع المطلوب تأكيدها. حتمى من الخادم؛ لا
+                يُعرض شيء إن غابت presentation (استجابة قديمة) فتبقى الشاشة
+                كما كانت. لا يستبدل أى بطاقة أدناه. */}
+            {result.presentation ? <GovernancePresentationView presentation={result.presentation} /> : null}
+
             {/* 1+2+3. الرد والتوصية والعقوبة مدموجة فى بطاقة واحدة — بطلب
                 صريح من صاحب المشروع بتاريخ 2026-09-18: «دمج الرد مع التوصية».
                 عند توفر recommendation: بطاقة واحدة تعرض شارتى الحكم والتوصية

@@ -59,6 +59,45 @@ export interface Citation {
   official_url: string | null;
   /** النص الحرفي للمادة (يُعرض بخط legal) */
   snippet: string;
+  /**
+   * حالة المصدر بمفردات العرض (ساري/معدّل/ملغى/غير محسوم) — مشتقة حتمياً من
+   * قاعدة بيانات backend لا من النموذج اللغوى. اختيارية: غائبة فى السجل
+   * التاريخى القديم؛ يُرجَع حينها إلى `status` (LegalStatusKey) للعرض.
+   */
+  source_status?: SourceStatusLabel;
+  /** معرّف القانون فى المنصة لبناء رابط التحقق /laws/{law_id}/articles/{article_no} — غائب/null فى السجل القديم */
+  law_id?: string | null;
+}
+
+/** حالة المصدر للعرض — تطابق backend (structured-answer.ts → SourceStatusLabel) */
+export type SourceStatusLabel = 'ساري' | 'معدّل' | 'ملغى' | 'غير محسوم';
+
+/** وسم الحكم: «نص» = منقول من النص ومُثبَت بمقتطف تحقق منه الخادم، «تفسير» = ربط/استنتاج/تطبيق */
+export type RulingKind = 'نص' | 'تفسير';
+
+/** حكم/حق/التزام واحد فى الإجابة المنظَّمة مع سنده ووسمه — يطابق StructuredRulingDto */
+export interface StructuredRuling {
+  claim: string;
+  kind: RulingKind;
+  /** فهرس (من صفر) المادة المستند إليها داخل citations فى نفس الاستجابة */
+  citation_index: number;
+  /** المقتطف الحرفى المنسوخ من المادة — لا يُعرض إلا إذا quote_verified=true */
+  quote: string | null;
+  quote_verified: boolean;
+}
+
+/**
+ * الإجابة المنظَّمة — يطابق StructuredAnswerDto فى backend. اختيارية فى
+ * QuestionAnswerResponse: غائبة/null عندما يرجع الخادم للمسار النصى القديم
+ * (answer فقط) — الواجهة تعرض حينها الشكل القديم دون أى تغيير.
+ */
+export interface StructuredAnswer {
+  direct_answer: string;
+  rulings: StructuredRuling[];
+  warnings: string[];
+  open_issues: string[];
+  facts_to_confirm: string[];
+  not_covered: string[];
 }
 
 /** مصدر واحد فى نتيجة بحث الويب الاحتياطى (Tier 2) — WebFallbackSourceDto فى backend */
@@ -99,6 +138,8 @@ export interface QuestionAnswerResponse {
   refused: boolean;
   /** نتيجة بحث ويب احتياطى غير موثَّقة (Tier 2) — موجودة فقط عند refused=true، وإلا null/undefined */
   web_fallback?: WebFallback | null;
+  /** الإجابة المنظَّمة (جواب مباشر + أحكام بسندها ووسمها + تحذيرات...) — غائبة/null عند المسار النصى القديم */
+  structured?: StructuredAnswer | null;
 }
 
 /** طلب POST /api/questions */
@@ -383,6 +424,8 @@ export interface GovernanceLegalBasis {
   snippet: string;
   /** رابط المصدر الرسمى — nullable (نفس مبدأ Citation.official_url) */
   official_url: string | null;
+  /** حالة المصدر (2026-10-05) — مشتقة حتمياً من قاعدة البيانات؛ غائبة فى استجابات قديمة */
+  source_status?: SourceStatusLabel;
 }
 
 /** طلب POST /api/governance/assess — يطابق AssessGovernanceDto (10-4000 حرفاً) */
@@ -433,6 +476,22 @@ export interface GovernanceAssessResponse {
    * (verdict="معلومات غير كافية" بلا نجاح بحث ويب تكميلى).
    */
   recommendation?: GovernanceRecommendation | null;
+  /**
+   * طبقة العرض المنظَّم (2026-10-05) — حتمية 100% (بلا نموذج لغوى) ولا تغيّر
+   * verdict/legal_basis/recommendation. غائبة فى استجابات قديمة.
+   */
+  presentation?: GovernancePresentation | null;
+}
+
+/** يطابق GovernancePresentationDto فى backend */
+export interface GovernancePresentation {
+  direct_answer: string;
+  /** وسم الحكم نفسه: «تفسير» (تطبيق من المنصة للنصوص على الواقعة) — null إن لم يُحسم الحكم */
+  verdict_kind: 'تفسير' | null;
+  verdict_kind_note: string | null;
+  warnings: string[];
+  open_issues: string[];
+  facts_to_confirm: string[];
 }
 
 /* ------------------------------------------------------------------------ */

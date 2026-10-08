@@ -29,13 +29,15 @@
 
 import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Scale } from 'lucide-react';
+import type { SourceStatusLabel } from '@/lib/types';
+import { SourceStatusChip } from '@/components/ui/SourceStatusChip';
 
 export interface GovernanceLawCitationGroupCardProps {
   law: string;
   lawNo: number;
   lawYear: number;
   officialUrl: string | null;
-  articles: Array<{ articleNo: number; snippet: string }>;
+  articles: Array<{ articleNo: number; snippet: string; sourceStatus?: SourceStatusLabel }>;
 }
 
 export function GovernanceLawCitationGroupCard({
@@ -72,7 +74,10 @@ export function GovernanceLawCitationGroupCard({
           const legalTextId = `governance-law-group-text-${instanceId}-${lawNo}-${article.articleNo}`;
           return (
             <div key={article.articleNo} className="py-3 first:pt-0 last:pb-0">
-              <p className="text-body font-medium text-text-primary">المادة {article.articleNo}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-body font-medium text-text-primary">المادة {article.articleNo}</p>
+                {article.sourceStatus ? <SourceStatusChip status={article.sourceStatus} /> : null}
+              </div>
 
               <button
                 type="button"

@@ -334,4 +334,54 @@ describe('GovernanceScreen', () => {
     expect(screen.queryByRole('status', { name: /الحكم:/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/وصف الإجراء أو القرار/)).toHaveValue('');
   }, 15000);
+
+  /**
+   * تغطية العرض المنظَّم 2026-10-05: presentation تظهر أولاً قبل بطاقة الحكم،
+   * وحالة المصدر تظهر على المادة المستشهد بها، وغيابها لا يغيّر الشاشة.
+   */
+  it('يعرض الجواب المباشر أولاً ثم التنبيهات، وحالة المصدر على المادة، عند وجود presentation', async () => {
+    const user = userEvent.setup();
+    mockedAssess.mockResolvedValue({
+      ...NON_COMPLIANT_RESPONSE,
+      legal_basis: [{ ...NON_COMPLIANT_RESPONSE.legal_basis[0], source_status: 'معدّل' }],
+      presentation: {
+        direct_answer: 'الإجراء غير متوافق مع النصوص القانونية المسترجَعة.',
+        verdict_kind: 'تفسير',
+        verdict_kind_note: 'الحكم تطبيق من المنصة للنصوص الحرفية أدناه.',
+        warnings: ['المادة 12 من قانون مكافحة غسل الأموال 80/2002 معدّلة.'],
+        open_issues: [],
+        facts_to_confirm: [],
+      },
+    });
+    render(<GovernanceScreen />);
+
+    await user.type(screen.getByLabelText(/وصف الإجراء أو القرار/), VALID_DESCRIPTION);
+    await user.click(screen.getByRole('button', { name: 'تحقق الآن' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('governance-presentation')).toBeInTheDocument();
+    });
+    expect(screen.getByText('الإجراء غير متوافق مع النصوص القانونية المسترجَعة.')).toBeInTheDocument();
+    expect(screen.getByTestId('verdict-kind')).toHaveTextContent('تفسير');
+    expect(screen.getByText(/معدّلة\./)).toBeInTheDocument();
+    expect(screen.getByTestId('source-status')).toHaveTextContent('معدّل');
+
+    const html = document.body.innerHTML;
+    expect(html.indexOf('الجواب المباشر')).toBeLessThan(html.indexOf('الحكم: غير متوافق'));
+  }, 15000);
+
+  it('لا يعرض قسم العرض المنظَّم عندما تغيب presentation (استجابة قديمة)', async () => {
+    const user = userEvent.setup();
+    mockedAssess.mockResolvedValue(NON_COMPLIANT_RESPONSE);
+    render(<GovernanceScreen />);
+
+    await user.type(screen.getByLabelText(/وصف الإجراء أو القرار/), VALID_DESCRIPTION);
+    await user.click(screen.getByRole('button', { name: 'تحقق الآن' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: /الحكم: غير متوافق/ })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('governance-presentation')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('source-status')).not.toBeInTheDocument();
+  }, 15000);
 });
