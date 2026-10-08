@@ -145,4 +145,61 @@ describe('StructuredAnswerView', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent('هذه المادة ملغاة');
   });
+  it('يرقّم السند تسلسلياً بترتيب ظهوره فى الأحكام ويطوي المصادر غير المستند إليها', async () => {
+    const user = userEvent.setup();
+    const many: Citation[] = [10, 20, 30, 40, 50].map((n) => ({ ...DEMO_CITATION, article_no: n, snippet: `نص المادة ${n}`, law_id: 'L' }));
+    render(
+      <StructuredAnswerView
+        structured={{
+          ...FULL,
+          warnings: [],
+          open_issues: [],
+          rulings: [
+            { claim: 'حكم أول', kind: 'تفسير', citation_index: 3, quote: null, quote_verified: false },
+            { claim: 'حكم ثانٍ', kind: 'تفسير', citation_index: 0, quote: null, quote_verified: false },
+          ],
+        }}
+        citations={many}
+      />,
+    );
+    const rulings = screen.getAllByTestId('ruling');
+    expect(within(rulings[0]).getByText('[1]')).toBeInTheDocument();
+    expect(within(rulings[0]).getByText(/المادة 40/)).toBeInTheDocument();
+    expect(within(rulings[1]).getByText('[2]')).toBeInTheDocument();
+
+    const sources = screen.getByRole('region', { name: 'المصادر' });
+    expect(within(sources).getAllByTestId('source-item')).toHaveLength(2);
+    expect(within(sources).getByText(/المصادر المستند إليها \(2\)/)).toBeInTheDocument();
+
+    await user.click(within(sources).getByRole('button', { name: /مصادر إضافية استُرجعت ولم يستند إليها حكم \(3\)/ }));
+    expect(within(sources).getAllByTestId('source-item')).toHaveLength(5);
+  });
+
+  it('يدمج المصدر المكرر حرفياً فلا يظهر مرتين', () => {
+    const dup: Citation[] = [
+      { ...DEMO_CITATION, article_no: 88, snippet: 'نفس النص', law_id: 'L' },
+      { ...DEMO_CITATION, article_no: 88, snippet: 'نفس النص', law_id: 'L' },
+    ];
+    render(
+      <StructuredAnswerView
+        structured={{
+          ...FULL,
+          rulings: [{ claim: 'حكم', kind: 'تفسير', citation_index: 1, quote: null, quote_verified: false }],
+        }}
+        citations={dup}
+      />,
+    );
+    expect(screen.getAllByTestId('source-item')).toHaveLength(1);
+  });
+
+  it('يحذف السنة المكررة من اسم القانون', () => {
+    render(
+      <StructuredAnswerView
+        structured={{ ...FULL, rulings: [FULL.rulings[0]] }}
+        citations={[{ ...CITATIONS[0], law: 'قانون العمل (2003)', law_year: 2003 }, CITATIONS[1]]}
+      />,
+    );
+    expect(screen.queryByText(/\(2003\) 12\/2003/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/قانون العمل 12\/2003/).length).toBeGreaterThan(0);
+  });
 });

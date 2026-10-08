@@ -19,7 +19,7 @@
 
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ChevronDown,
@@ -33,7 +33,15 @@ import {
   Search,
 } from 'lucide-react';
 import type { Citation, StructuredAnswer, StructuredRuling } from '@/lib/types';
-import { articleHref, groupCitationsByLaw, safeHttpUrl, sourceStatusOf } from '@/lib/structured-answer';
+import {
+  articleHref,
+  buildDisplaySources,
+  cleanLawName,
+  groupSources,
+  safeHttpUrl,
+  sourceStatusOf,
+  type DisplaySource,
+} from '@/lib/structured-answer';
 import { SourceStatusChip } from '@/components/ui/SourceStatusChip';
 
 export interface StructuredAnswerViewProps {
@@ -74,7 +82,15 @@ function KindChip({ kind }: { kind: StructuredRuling['kind'] }) {
   );
 }
 
-function RulingItem({ ruling, citations }: { ruling: StructuredRuling; citations: ReadonlyArray<Citation> }) {
+function RulingItem({
+  ruling,
+  citations,
+  displayNo,
+}: {
+  ruling: StructuredRuling;
+  citations: ReadonlyArray<Citation>;
+  displayNo: number | undefined;
+}) {
   const citation = citations[ruling.citation_index];
   const href = citation ? articleHref(citation) : null;
   const officialUrl = citation ? safeHttpUrl(citation.official_url) : null;
@@ -90,8 +106,8 @@ function RulingItem({ ruling, citations }: { ruling: StructuredRuling; citations
       {citation ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-text-secondary">
           <span>
-            السند: <span className="font-semibold text-text-primary">[{ruling.citation_index + 1}]</span> {citation.law}{' '}
-            {citation.law_no}/{citation.law_year} — المادة {citation.article_no}
+            السند: <span className="font-semibold text-text-primary">[{displayNo ?? ruling.citation_index + 1}]</span>{' '}
+            {cleanLawName(citation.law, citation.law_year)} {citation.law_no}/{citation.law_year} — المادة {citation.article_no}
           </span>
           <SourceStatusChip status={sourceStatusOf(citation)} />
           {href ? (
@@ -125,24 +141,21 @@ function RulingItem({ ruling, citations }: { ruling: StructuredRuling; citations
   );
 }
 
-function SourcesSection({ citations }: { citations: ReadonlyArray<Citation> }) {
+function SourceGroups({ sources, instanceId }: { sources: ReadonlyArray<DisplaySource>; instanceId: string }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const groups = groupCitationsByLaw(citations);
-  if (groups.length === 0) return null;
+  const groups = groupSources(sources);
 
-  function toggle(index: number) {
+  function toggle(no: number) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+      if (next.has(no)) next.delete(no);
+      else next.add(no);
       return next;
     });
   }
 
   return (
-    <section aria-label="المصادر" className="space-y-3">
-      <SectionHeading>المصادر ({citations.length})</SectionHeading>
+    <>
       {groups.map((group) => (
         <div key={group.key} className="rounded-lg border border-border-default bg-surface p-4">
           <div className="flex items-center gap-2">
@@ -152,16 +165,16 @@ function SourcesSection({ citations }: { citations: ReadonlyArray<Citation> }) {
             </h4>
           </div>
           <ul className="mt-2 divide-y divide-border-default">
-            {group.entries.map(({ index, citation }) => {
-              const open = expanded.has(index);
-              const textId = `src-text-${instanceId}-${index}`;
+            {group.entries.map(({ displayNo, citation }) => {
+              const open = expanded.has(displayNo);
+              const textId = `src-text-${instanceId}-${displayNo}`;
               const href = articleHref(citation);
               const officialUrl = safeHttpUrl(citation.official_url);
               return (
-                <li key={index} className="py-3 first:pt-0 last:pb-0" data-testid="source-item">
+                <li key={displayNo} className="py-3 first:pt-0 last:pb-0" data-testid="source-item">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-body font-medium text-text-primary">
-                      [{index + 1}] المادة {citation.article_no}
+                      [{displayNo}] المادة {citation.article_no}
                     </span>
                     <SourceStatusChip status={sourceStatusOf(citation)} />
                     {href ? (
@@ -193,7 +206,7 @@ function SourcesSection({ citations }: { citations: ReadonlyArray<Citation> }) {
                     type="button"
                     aria-expanded={open}
                     aria-controls={textId}
-                    onClick={() => toggle(index)}
+                    onClick={() => toggle(displayNo)}
                     className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-body-sm font-semibold text-link hover:text-primary-hover focus-visible:outline-none"
                   >
                     {open ? (
@@ -217,11 +230,61 @@ function SourcesSection({ citations }: { citations: ReadonlyArray<Citation> }) {
           </ul>
         </div>
       ))}
+    </>
+  );
+}
+
+/**
+ * المصادر: المستند إليها فى الأحكام أولاً (بأرقام تسلسلية بترتيب ظهورها)، وما
+ * استُرجع ولم يستند إليه حكم فى قسم «إضافية» مطوي افتراضياً — للإيجاز: لا نعرض
+ * 17 مصدراً منها 11 لا علاقة لحكم بها. إن لم يستند حكم لأى مصدر نعرض الكل.
+ */
+function SourcesSection({ display }: { display: ReturnType<typeof buildDisplaySources> }) {
+  const [extraOpen, setExtraOpen] = useState(false);
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const { cited, extra } = display;
+  if (cited.length === 0 && extra.length === 0) return null;
+  const primary = cited.length > 0 ? cited : extra;
+  const rest = cited.length > 0 ? extra : [];
+  const extraId = `src-extra-${instanceId}`;
+
+  return (
+    <section aria-label="المصادر" className="space-y-3">
+      <SectionHeading>
+        {cited.length > 0 ? `المصادر المستند إليها (${cited.length})` : `المصادر (${extra.length})`}
+      </SectionHeading>
+      <SourceGroups sources={primary} instanceId={`${instanceId}p`} />
+      {rest.length > 0 ? (
+        <div>
+          <button
+            type="button"
+            aria-expanded={extraOpen}
+            aria-controls={extraId}
+            onClick={() => setExtraOpen((v) => !v)}
+            className="inline-flex min-h-[44px] items-center gap-1 text-body-sm font-semibold text-link hover:text-primary-hover focus-visible:outline-none"
+          >
+            {extraOpen ? (
+              <ChevronUp className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span>
+              {extraOpen ? 'إخفاء' : 'عرض'} مصادر إضافية استُرجعت ولم يستند إليها حكم ({rest.length})
+            </span>
+          </button>
+          {extraOpen ? (
+            <div id={extraId} className="mt-2 space-y-3">
+              <SourceGroups sources={rest} instanceId={`${instanceId}e`} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
 
 export function StructuredAnswerView({ structured, citations }: StructuredAnswerViewProps) {
+  const display = useMemo(() => buildDisplaySources(citations, structured.rulings), [citations, structured.rulings]);
   const hasAlerts = structured.warnings.length > 0 || structured.open_issues.length > 0;
 
   return (
@@ -277,7 +340,12 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
           </p>
           <ul className="space-y-3">
             {structured.rulings.map((ruling, index) => (
-              <RulingItem key={`${index}-${ruling.claim}`} ruling={ruling} citations={citations} />
+              <RulingItem
+                key={`${index}-${ruling.claim}`}
+                ruling={ruling}
+                citations={citations}
+                displayNo={display.numberByOrigIndex.get(ruling.citation_index)}
+              />
             ))}
           </ul>
         </section>
@@ -295,7 +363,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
       ) : null}
 
       {/* 6. المصادر مجمَّعة */}
-      <SourcesSection citations={citations} />
+      <SourcesSection display={display} />
     </div>
   );
 }

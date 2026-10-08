@@ -96,25 +96,101 @@ export function articleHref(c: Pick<Citation, 'law_id' | 'article_no'>): string 
   return `/laws/${encodeURIComponent(c.law_id)}/articles/${c.article_no}`;
 }
 
+/**
+ * اسم القانون للعرض: بعض السجلات تحمل السنة داخل الاسم نفسه («قانون العمل (2025)»)
+ * فيظهر «قانون العمل (2025) 14/2025» بتكرار السنة؛ نحذف الأقواس إن طابقت law_year.
+ */
+export function cleanLawName(name: string, lawYear: number): string {
+  return name.replace(/\s*[(\uFD3E]\s*(\d{4})\s*[)\uFD3F]\s*$/, (m, y: string) => (Number(y) === lawYear ? '' : m)).trim();
+}
+
+export interface DisplaySource {
+  /** الرقم المعروض للمستخدم (يبدأ من 1) — بترتيب أول استشهاد فى الأحكام ثم الباقى */
+  displayNo: number;
+  /** فهرس المادة الأصلى داخل citations */
+  origIndex: number;
+  citation: Citation;
+  /** هل استند إليها حكم واحد على الأقل */
+  cited: boolean;
+}
+
+export interface DisplaySources {
+  cited: DisplaySource[];
+  extra: DisplaySource[];
+  /** فهرس أصلى (citation_index) → الرقم المعروض؛ غائب إن كان الفهرس خارج النطاق */
+  numberByOrigIndex: Map<number, number>;
+}
+
+/**
+ * يرتّب المصادر للعرض: (1) يدمج التكرار الحرفى (نفس القانون والمادة والنص)،
+ * (2) يرقّم المصادر المستند إليها بترتيب أول ظهور لها فى الأحكام فيصير تسلسل
+ * الأرقام فى الأحكام 1،2،3… لا [1][5][13][3]، (3) يضع ما استُرجع ولم يستند إليه
+ * أى حكم فى قائمة «إضافية» منفصلة بأرقام لاحقة.
+ */
+export function buildDisplaySources(
+  citations: readonly Citation[],
+  rulings: ReadonlyArray<Pick<StructuredRuling, 'citation_index'>>,
+): DisplaySources {
+  const canonical: number[] = [];
+  const firstByKey = new Map<string, number>();
+  citations.forEach((c, i) => {
+    const key = `${c.law_no}|${c.law_year}|${c.article_no}|${c.snippet.replace(/\s+/g, ' ').trim()}`;
+    const first = firstByKey.get(key);
+    if (first === undefined) {
+      firstByKey.set(key, i);
+      canonical[i] = i;
+    } else {
+      canonical[i] = first;
+    }
+  });
+
+  const numberByCanonical = new Map<number, number>();
+  const cited: DisplaySource[] = [];
+  for (const r of rulings) {
+    const idx = r.citation_index;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= citations.length) continue;
+    const canon = canonical[idx];
+    if (numberByCanonical.has(canon)) continue;
+    const no = numberByCanonical.size + 1;
+    numberByCanonical.set(canon, no);
+    cited.push({ displayNo: no, origIndex: canon, citation: citations[canon], cited: true });
+  }
+  const extra: DisplaySource[] = [];
+  citations.forEach((c, i) => {
+    if (canonical[i] !== i || numberByCanonical.has(i)) return;
+    const no = numberByCanonical.size + 1;
+    numberByCanonical.set(i, no);
+    extra.push({ displayNo: no, origIndex: i, citation: c, cited: false });
+  });
+
+  const numberByOrigIndex = new Map<number, number>();
+  citations.forEach((_, i) => {
+    const no = numberByCanonical.get(canonical[i]);
+    if (no !== undefined) numberByOrigIndex.set(i, no);
+  });
+  return { cited, extra, numberByOrigIndex };
+}
+
 export interface SourceGroup {
   key: string;
   law: string;
   lawNo: number;
   lawYear: number;
-  entries: Array<{ index: number; citation: Citation }>;
+  entries: DisplaySource[];
 }
 
-/** تجميع المصادر بحسب القانون مع الإبقاء على الرقم الأصلي لكل مادة (يربط الحكم بسنده) */
-export function groupCitationsByLaw(citations: readonly Citation[]): SourceGroup[] {
+/** تجميع المصادر بحسب القانون مع الإبقاء على الرقم المعروض لكل مادة (يربط الحكم بسنده) */
+export function groupSources(sources: readonly DisplaySource[]): SourceGroup[] {
   const map = new Map<string, SourceGroup>();
-  citations.forEach((citation, index) => {
-    const key = `${citation.law_no}-${citation.law_year}-${citation.law}`;
+  for (const src of sources) {
+    const c = src.citation;
+    const key = `${c.law_no}-${c.law_year}-${c.law}`;
     let g = map.get(key);
     if (!g) {
-      g = { key, law: citation.law, lawNo: citation.law_no, lawYear: citation.law_year, entries: [] };
+      g = { key, law: cleanLawName(c.law, c.law_year), lawNo: c.law_no, lawYear: c.law_year, entries: [] };
       map.set(key, g);
     }
-    g.entries.push({ index, citation });
-  });
+    g.entries.push(src);
+  }
   return Array.from(map.values());
 }
