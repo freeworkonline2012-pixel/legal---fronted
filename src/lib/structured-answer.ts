@@ -28,6 +28,16 @@ function strList(v: unknown): string[] {
 }
 
 /**
+ * يزيل أداة الشرط الافتتاحية («إذا/إن/لو/في حال/عند») من شرط السيناريو لأن العرض يضيف «إذا» قبله
+ * (تفادياً لـ«إذا إذا ...»). يغطى أيضاً الإجابات المخزَّنة في السجل قبل إصلاح الخادم.
+ */
+export function stripConditionLead(condition: string): string {
+  return condition
+    .replace(/^\s*(?:[وف]\s*)?(?:(?:إذا|اذا|إن|لو)|فى\s+حال(?:ة)?|في\s+حال(?:ة)?|عند(?:ما)?)\s+/, '')
+    .trim();
+}
+
+/**
  * يفحص بنية `structured` القادمة من الخادم. يُعيد null (→ الشكل القديم) إن
  * غاب الجواب المباشر أو لم تكن البنية كائناً. الأحكام الفاسدة تُسقَط فردياً
  * ولا تُسقط الإجابة كلها. وسم غير معروف يُعامَل «تفسير» (الأحوط: لا نُظهر
@@ -66,7 +76,7 @@ export function parseStructuredAnswer(raw: unknown): StructuredAnswer | null {
     for (const item of r.scenarios) {
       if (!item || typeof item !== 'object') continue;
       const x = item as Record<string, unknown>;
-      const condition = typeof x.condition === 'string' ? x.condition.trim() : '';
+      const condition = typeof x.condition === 'string' ? stripConditionLead(x.condition.trim()) : '';
       const outcome = typeof x.outcome === 'string' ? x.outcome.trim() : '';
       if (condition.length === 0 || outcome.length === 0) continue;
       const idx = typeof x.citation_index === 'number' && Number.isInteger(x.citation_index) ? x.citation_index : -1;

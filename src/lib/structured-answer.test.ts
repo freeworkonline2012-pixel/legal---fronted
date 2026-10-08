@@ -6,6 +6,7 @@ import {
   parseStructuredAnswer,
   safeHttpUrl,
   sourceStatusOf,
+  stripConditionLead,
 } from './structured-answer';
 import { DEMO_CITATION } from './demo-data';
 
@@ -89,9 +90,26 @@ describe('parseStructuredAnswer — السيناريوهات التطبيقية'
       ],
     });
     expect(r?.scenarios).toEqual([
-      { condition: 'إذا كانت الخدمة أقل من خمس سنوات', outcome: 'لا مكافأة', citation_index: 2 },
+      { condition: 'كانت الخدمة أقل من خمس سنوات', outcome: 'لا مكافأة', citation_index: 2 },
       { condition: 'فهرس نصى', outcome: 'نتيجة', citation_index: -1 },
     ]);
+  });
+
+  it('يزيل أداة الشرط الافتتاحية فلا يظهر «إذا إذا» (ويغطى إجابات السجل القديمة)', () => {
+    const r = parseStructuredAnswer({
+      ...base,
+      scenarios: [
+        { condition: 'إذا استمر تنفيذ العقد بعد انتهاء مدته', outcome: 'يُعامل كغير محدد المدة', citation_index: 0 },
+        { condition: 'في حال عدم كتابة العقد', outcome: 'يُعتبر غير محدد المدة', citation_index: 0 },
+        { condition: 'إنهاء العقد من صاحب العمل', outcome: 'يستحق مكافأة', citation_index: 0 },
+      ],
+    });
+    expect(r?.scenarios?.map((s) => s.condition)).toEqual([
+      'استمر تنفيذ العقد بعد انتهاء مدته',
+      'عدم كتابة العقد',
+      'إنهاء العقد من صاحب العمل',
+    ]);
+    expect(stripConditionLead('إذا')).toBe('إذا');
   });
 
   it('scenarios ليست مصفوفة لا تُسقط الإجابة', () => {
