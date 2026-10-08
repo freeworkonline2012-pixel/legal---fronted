@@ -325,7 +325,12 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
               }
               if (message.kind === 'clarification' && message.clarification) {
                 return (
-                  <MessageBubble key={message.id} role="assistant">
+                  // بعرض الصفحة لا فى فقاعة ضيقة: الأسئلة تُعرض فى أعمدة (راجع ClarificationCard)
+                  <div
+                    key={message.id}
+                    className="w-full rounded-lg border border-border-default bg-surface p-4 text-text-primary sm:p-5"
+                    data-testid="clarification-panel"
+                  >
                     <ClarificationCard
                       request={message.clarification}
                       resolvedAnswers={message.clarificationResolved}
@@ -333,7 +338,7 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
                       onSubmit={(answers) => handleClarificationSubmit(message, answers)}
                       onSkip={() => handleClarificationSkip(message)}
                     />
-                  </MessageBubble>
+                  </div>
                 );
               }
               if (message.kind === 'refusal' && message.answer) {

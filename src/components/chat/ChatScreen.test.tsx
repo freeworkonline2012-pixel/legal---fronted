@@ -185,7 +185,7 @@ describe('ChatScreen', () => {
       await waitFor(() => expect(screen.getByText(/1\. ما نوع عقد العمل؟/)).toBeInTheDocument());
       expect(mockedPostQuestion).toHaveBeenNthCalledWith(1, { question: 'ما حقوقى عند الفصل؟', conversation_id: undefined });
 
-      await user.click(screen.getByLabelText('محدد المدة'));
+      await user.selectOptions(screen.getByRole('combobox', { name: /ما نوع عقد العمل؟/ }), 'محدد المدة');
       await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
 
       await waitFor(() => expect(screen.getByText(DEMO_ANSWER.answer)).toBeInTheDocument());
@@ -208,11 +208,11 @@ describe('ChatScreen', () => {
       renderScreen();
       await ask(user, 'ما حقوقى عند الفصل؟');
       await waitFor(() => expect(screen.getByText(/1\. ما نوع عقد العمل؟/)).toBeInTheDocument());
-      await user.click(screen.getByLabelText('محدد المدة'));
+      await user.selectOptions(screen.getByRole('combobox', { name: /ما نوع عقد العمل؟/ }), 'محدد المدة');
       await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
 
       await waitFor(() => expect(screen.getByText(/1\. من الذى أنهى العلاقة؟/)).toBeInTheDocument());
-      await user.click(screen.getByLabelText('لا أعرف'));
+      await user.selectOptions(screen.getByRole('combobox', { name: /من الذى أنهى العلاقة؟/ }), 'لا أعرف');
       await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
 
       await waitFor(() => expect(screen.getByText(DEMO_ANSWER.answer)).toBeInTheDocument());
@@ -264,8 +264,8 @@ describe('ChatScreen', () => {
         .mockResolvedValueOnce(DEMO_ANSWER);
       renderScreen();
       await ask(user, 'ما حقوقى عند الفصل؟');
-      await waitFor(() => expect(screen.getByLabelText('محدد المدة')).toBeInTheDocument());
-      await user.click(screen.getByLabelText('محدد المدة'));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: /ما نوع عقد العمل؟/ })).toBeInTheDocument());
+      await user.selectOptions(screen.getByRole('combobox', { name: /ما نوع عقد العمل؟/ }), 'محدد المدة');
       await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
       await waitFor(() => expect(screen.getByRole('button', { name: /إعادة المحاولة/ })).toBeInTheDocument());
 

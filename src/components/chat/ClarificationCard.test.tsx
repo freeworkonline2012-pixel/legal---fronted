@@ -14,28 +14,43 @@ const REQUEST: ClarificationRequest = {
 };
 
 describe('ClarificationCard', () => {
-  it('يعرض الأسئلة والخيارات و«أخرى» و«لا أعرف» وتنبيه حماية البيانات، والإرسال معطّل حتى يكتمل الجواب', () => {
+  it('يعرض الأسئلة فى شبكة أعمدة بقوائم منسدلة فيها «أخرى» و«لا أعرف» وتنبيه حماية البيانات، والإرسال معطّل حتى يكتمل الجواب', () => {
     render(<ClarificationCard request={REQUEST} onSubmit={jest.fn()} onSkip={jest.fn()} />);
     expect(screen.getByText(/1\. ما نوع العقد؟/)).toBeInTheDocument();
     expect(screen.getByText('تختلف الحقوق (المادتان 87 و88)')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('لا أعرف')).toHaveLength(2);
-    expect(screen.getAllByLabelText('أخرى (اكتب إجابتك)')).toHaveLength(2);
+    // الشبكة: الأسئلة جنباً إلى جنب على الشاشات المتوسطة فأكبر لا صفاً طويلاً
+    const questions = screen.getAllByTestId('clarification-question');
+    expect(questions).toHaveLength(2);
+    expect(questions[0].parentElement?.className).toContain('md:grid-cols-2');
+    // اختيار مفرد = قائمة منسدلة بالخيارات + أخرى + لا أعرف
+    const select = screen.getByRole('combobox', { name: /ما نوع العقد؟/ });
+    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+      'اختر الإجابة…',
+      'محدد المدة',
+      'غير محدد المدة',
+      'أخرى (اكتب إجابتك)',
+      'لا أعرف',
+    ]);
+    // متعدد = قائمة منسدلة بخانات اختيار
+    expect(screen.getByLabelText('استقالة')).toHaveAttribute('type', 'checkbox');
+    expect(screen.getByLabelText('لا أعرف', { selector: 'input' })).toBeInTheDocument();
     expect(screen.getByText(/لا تكتب أسماء أو أرقام هواتف/)).toBeInTheDocument();
     expect(screen.getByText(/الجولة 1 من 2/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'إرسال الإجابات' })).toBeDisabled();
   });
 
-  it('اختيار + «لا أعرف» + نص حر → حمولة صحيحة عند الإرسال', async () => {
+  it('اختيار من القائمة + خانات + نص حر → حمولة صحيحة عند الإرسال', async () => {
     const user = userEvent.setup();
     const onSubmit = jest.fn();
     render(<ClarificationCard request={REQUEST} onSubmit={onSubmit} onSkip={jest.fn()} />);
 
-    await user.click(screen.getByLabelText('محدد المدة'));
+    await user.selectOptions(screen.getByRole('combobox', { name: /ما نوع العقد؟/ }), 'محدد المدة');
     expect(screen.getByRole('button', { name: 'إرسال الإجابات' })).toBeDisabled();
 
     await user.click(screen.getByLabelText('استقالة'));
-    await user.click(screen.getAllByLabelText('أخرى (اكتب إجابتك)')[1]);
+    await user.click(screen.getByLabelText('أخرى (اكتب إجابتك)', { selector: 'input[type="checkbox"]' }));
     await user.type(screen.getByLabelText('إجابتك عن: ما سبب الإنهاء؟'), 'اتفاق ودى');
+    expect(screen.getByTestId('multi-summary')).toHaveTextContent('استقالة، اتفاق ودى');
 
     const submit = screen.getByRole('button', { name: 'إرسال الإجابات' });
     expect(submit).toBeEnabled();
@@ -46,13 +61,23 @@ describe('ClarificationCard', () => {
     ]);
   });
 
+  it('«أخرى» فى القائمة المنسدلة تُظهر حقل النص، والرجوع لخيار يخفيه', async () => {
+    const user = userEvent.setup();
+    render(<ClarificationCard request={REQUEST} onSubmit={jest.fn()} onSkip={jest.fn()} />);
+    const select = screen.getByRole('combobox', { name: /ما نوع العقد؟/ });
+    await user.selectOptions(select, 'أخرى (اكتب إجابتك)');
+    expect(screen.getByLabelText('إجابتك عن: ما نوع العقد؟')).toBeInTheDocument();
+    await user.selectOptions(select, 'غير محدد المدة');
+    expect(screen.queryByLabelText('إجابتك عن: ما نوع العقد؟')).not.toBeInTheDocument();
+  });
+
   it('«لا أعرف» تكفى للسؤال، والتخطى متاح دائماً', async () => {
     const user = userEvent.setup();
     const onSubmit = jest.fn();
     const onSkip = jest.fn();
     render(<ClarificationCard request={REQUEST} onSubmit={onSubmit} onSkip={onSkip} />);
-    await user.click(screen.getAllByLabelText('لا أعرف')[0]);
-    await user.click(screen.getAllByLabelText('لا أعرف')[1]);
+    await user.selectOptions(screen.getByRole('combobox', { name: /ما نوع العقد؟/ }), 'لا أعرف');
+    await user.click(screen.getByLabelText('لا أعرف', { selector: 'input' }));
     await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
     expect(onSubmit.mock.calls[0][0].map((a: { kind: string }) => a.kind)).toEqual(['unknown', 'unknown']);
 
