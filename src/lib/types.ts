@@ -102,8 +102,20 @@ export interface StructuredScenario {
   citation_index: number;
 }
 
+/**
+ * واقعة ذكرها السائل فى الاستيضاح مطبَّقة على نص: «الواقعة ← أثرها القانونى» (يطابق StructuredFactAppliedDto).
+ * غائبة فى الأسئلة العادية وفى ردود الخادم الأقدم.
+ */
+export interface StructuredFactApplied {
+  fact: string;
+  effect: string;
+  /** فهرس (من صفر) المادة المستند إليها داخل citations، أو null */
+  citation_index: number | null;
+}
+
 export interface StructuredAnswer {
   direct_answer: string;
+  facts_applied?: StructuredFactApplied[];
   rulings: StructuredRuling[];
   /** اختيارى: غائب فى ردود الخادم الأقدم */
   scenarios?: StructuredScenario[];

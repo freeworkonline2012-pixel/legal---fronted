@@ -117,6 +117,32 @@ describe('parseStructuredAnswer — السيناريوهات التطبيقية'
   });
 });
 
+describe('parseStructuredAnswer — وقائعك وأثرها (facts_applied)', () => {
+  const base = { direct_answer: 'جواب.', rulings: [] };
+
+  it('تغيب فى ردود الخادم الأقدم ولا يظهر المفتاح', () => {
+    expect(parseStructuredAnswer(base)).not.toHaveProperty('facts_applied');
+    expect(parseStructuredAnswer({ ...base, facts_applied: [] })).not.toHaveProperty('facts_applied');
+  });
+
+  it('يقبل السليم ويُسقط الفاسد وحده ويحوّل الفهرس غير الصحيح إلى null', () => {
+    const r = parseStructuredAnswer({
+      ...base,
+      facts_applied: [
+        { fact: ' مدة الخدمة 12 سنة ', effect: 'تعويض لا يقل عن 24 شهراً', citation_index: 1 },
+        { fact: '', effect: 'بلا واقعة', citation_index: 0 },
+        { fact: 'بلا أثر', effect: '  ', citation_index: 0 },
+        'نص عشوائى',
+        { fact: 'فهرس نصى', effect: 'أثر', citation_index: '1' },
+      ],
+    });
+    expect(r?.facts_applied).toEqual([
+      { fact: 'مدة الخدمة 12 سنة', effect: 'تعويض لا يقل عن 24 شهراً', citation_index: 1 },
+      { fact: 'فهرس نصى', effect: 'أثر', citation_index: null },
+    ]);
+  });
+});
+
 describe('sourceStatusOf', () => {
   it('يفضّل قيمة الخادم', () => {
     expect(sourceStatusOf({ ...DEMO_CITATION, source_status: 'غير محسوم' })).toBe('غير محسوم');

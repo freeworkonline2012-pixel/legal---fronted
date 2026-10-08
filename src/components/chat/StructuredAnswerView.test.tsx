@@ -252,4 +252,36 @@ describe('StructuredAnswerView', () => {
       expect(screen.getByTestId('scenario')).toBeInTheDocument();
     });
   });
+
+  describe('وقائعك وأثرها القانوني (facts_applied)', () => {
+    const FACTS = [
+      { fact: 'مدة الخدمة 12 سنة', effect: 'تعويض لا يقل عن 24 شهراً من الأجر.', citation_index: 1 },
+      { fact: 'العمل مستمر بطبيعته', effect: 'يُعامل العقد كغير محدد المدة.', citation_index: 0 },
+      { fact: 'الإخطار شفوي', effect: 'لا يغنى عن الإخطار الكتابى.', citation_index: null },
+    ];
+
+    it('يظهر بعد الجواب المباشر وقبل «تطبيق على حالتك» مع سند كل واقعة، وواقعة بلا سند لا تنهار', () => {
+      render(
+        <StructuredAnswerView
+          structured={{ ...FULL, facts_applied: FACTS, scenarios: [{ condition: 'ش', outcome: 'ن', citation_index: 0 }] }}
+          citations={CITATIONS}
+        />,
+      );
+      const html = document.body.innerHTML;
+      expect(html.indexOf('الجواب المباشر')).toBeLessThan(html.indexOf('وقائعك وأثرها القانوني'));
+      expect(html.indexOf('وقائعك وأثرها القانوني')).toBeLessThan(html.indexOf('تطبيق على حالتك'));
+      const items = screen.getAllByTestId('fact-applied');
+      expect(items).toHaveLength(3);
+      expect(within(items[0]).getByText(/مدة الخدمة 12 سنة:/)).toBeInTheDocument();
+      expect(within(items[0]).getByText(/المادة 7/)).toBeInTheDocument();
+      expect(within(items[0]).getByText('[1]')).toBeInTheDocument();
+      expect(within(items[2]).queryByText(/السند/)).not.toBeInTheDocument();
+    });
+
+    it('بلا facts_applied لا يظهر القسم', () => {
+      render(<StructuredAnswerView structured={FULL} citations={CITATIONS} />);
+      expect(screen.queryByText('وقائعك وأثرها القانوني')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('fact-applied')).not.toBeInTheDocument();
+    });
+  });
 });

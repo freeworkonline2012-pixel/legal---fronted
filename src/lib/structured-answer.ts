@@ -12,6 +12,7 @@ import type {
   RulingKind,
   SourceStatusLabel,
   StructuredAnswer,
+  StructuredFactApplied,
   StructuredRuling,
   StructuredScenario,
 } from './types';
@@ -84,8 +85,22 @@ export function parseStructuredAnswer(raw: unknown): StructuredAnswer | null {
     }
   }
 
+  const factsApplied: StructuredFactApplied[] = [];
+  if (Array.isArray(r.facts_applied)) {
+    for (const item of r.facts_applied) {
+      if (!item || typeof item !== 'object') continue;
+      const x = item as Record<string, unknown>;
+      const fact = typeof x.fact === 'string' ? x.fact.trim() : '';
+      const effect = typeof x.effect === 'string' ? x.effect.trim() : '';
+      if (fact.length === 0 || effect.length === 0) continue;
+      const idx = typeof x.citation_index === 'number' && Number.isInteger(x.citation_index) ? x.citation_index : null;
+      factsApplied.push({ fact, effect, citation_index: idx });
+    }
+  }
+
   return {
     direct_answer: direct,
+    ...(factsApplied.length > 0 ? { facts_applied: factsApplied } : {}),
     rulings,
     scenarios,
     warnings: strList(r.warnings),

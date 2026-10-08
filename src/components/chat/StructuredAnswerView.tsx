@@ -6,6 +6,7 @@
  *
  * الترتيب (من الأهم للأقل، ولا يتغير):
  *  1. الجواب المباشر — أول شيء، قبل أي تفصيل.
+ *  1م. وقائعك وأثرها القانونى — ما ذكره السائل فى الاستيضاح مطبَّقاً على النصوص (بعد الاستيضاح فقط).
  *  2. تطبيق على حالتك — خلاصة «إن كانت الواقعة كذا فالنتيجة كذا» بسندها (إن وُجدت).
  *  3. تنبيهات ومسائل مفتوحة — بارزة هنا لا فى آخر الإجابة.
  *  4. ما نحتاج منك تأكيده — الوقائع التى تُحوِّل الإجابة إلى قاطعة.
@@ -29,12 +30,19 @@ import {
   ExternalLink,
   FileText,
   GitBranch,
+  ListChecks,
   HelpCircle,
   Lightbulb,
   Scale,
   Search,
 } from 'lucide-react';
-import type { Citation, StructuredAnswer, StructuredRuling, StructuredScenario } from '@/lib/types';
+import type {
+  Citation,
+  StructuredAnswer,
+  StructuredFactApplied,
+  StructuredRuling,
+  StructuredScenario,
+} from '@/lib/types';
 import {
   articleHref,
   buildDisplaySources,
@@ -163,6 +171,43 @@ function ScenarioItem({
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-text-secondary">
           <span>
             السند: <span className="font-semibold text-text-primary">[{displayNo ?? scenario.citation_index + 1}]</span>{' '}
+            {cleanLawName(citation.law, citation.law_year)} {citation.law_no}/{citation.law_year} — المادة {citation.article_no}
+          </span>
+          <SourceStatusChip status={sourceStatusOf(citation)} />
+          {href ? (
+            <a
+              href={href}
+              className="inline-flex min-h-[44px] items-center font-medium text-link underline decoration-link underline-offset-4 hover:text-primary-hover focus-visible:outline-none"
+            >
+              تحقق من نص المادة
+            </a>
+          ) : null}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+function FactAppliedItem({
+  item,
+  citations,
+  displayNo,
+}: {
+  item: StructuredFactApplied;
+  citations: ReadonlyArray<Citation>;
+  displayNo: number | undefined;
+}) {
+  const citation = item.citation_index === null ? undefined : citations[item.citation_index];
+  const href = citation ? articleHref(citation) : null;
+  return (
+    <li className="rounded-md border border-border-default bg-surface p-3" data-testid="fact-applied">
+      <p className="text-body text-text-primary">
+        <span className="font-semibold">{item.fact}:</span> {item.effect}
+      </p>
+      {citation ? (
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-text-secondary">
+          <span>
+            السند: <span className="font-semibold text-text-primary">[{displayNo ?? (item.citation_index ?? 0) + 1}]</span>{' '}
             {cleanLawName(citation.law, citation.law_year)} {citation.law_no}/{citation.law_year} — المادة {citation.article_no}
           </span>
           <SourceStatusChip status={sourceStatusOf(citation)} />
@@ -325,9 +370,15 @@ function SourcesSection({ display }: { display: ReturnType<typeof buildDisplaySo
 export function StructuredAnswerView({ structured, citations }: StructuredAnswerViewProps) {
   const scenarios = useMemo(() => structured.scenarios ?? [], [structured.scenarios]);
   // ترقيم المصادر بترتيب ظهورها فى الصفحة: السيناريوهات (قبل الأحكام) ثم الأحكام.
+  const factsApplied = useMemo(() => structured.facts_applied ?? [], [structured.facts_applied]);
   const display = useMemo(
-    () => buildDisplaySources(citations, [...scenarios, ...structured.rulings]),
-    [citations, scenarios, structured.rulings],
+    () =>
+      buildDisplaySources(citations, [
+        ...factsApplied.map((f) => ({ citation_index: f.citation_index ?? -1 })),
+        ...scenarios,
+        ...structured.rulings,
+      ]),
+    [citations, factsApplied, scenarios, structured.rulings],
   );
   const hasAlerts = structured.warnings.length > 0 || structured.open_issues.length > 0;
 
@@ -338,6 +389,29 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         <p className="text-caption font-semibold text-primary">الجواب المباشر</p>
         <p className="mt-1 text-body-lg font-semibold text-text-primary">{structured.direct_answer}</p>
       </section>
+
+      {/* 1م. وقائعك وأثرها (بعد الاستيضاح فقط) */}
+      {factsApplied.length > 0 ? (
+        <section aria-label="وقائعك وأثرها القانوني" className="rounded-lg border border-border-default bg-surface-muted p-4">
+          <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
+            <ListChecks className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <span>وقائعك وأثرها القانوني</span>
+          </h3>
+          <p className="mt-1 text-body-sm text-text-secondary">
+            ما ذكرتَه في إجاباتك مطبَّقاً على نص المادة؛ بُني عليه الجواب المباشر.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {factsApplied.map((item, index) => (
+              <FactAppliedItem
+                key={`${index}-${item.fact}`}
+                item={item}
+                citations={citations}
+                displayNo={item.citation_index === null ? undefined : display.numberByOrigIndex.get(item.citation_index)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* 2. تطبيق على حالتك */}
       {scenarios.length > 0 ? (
