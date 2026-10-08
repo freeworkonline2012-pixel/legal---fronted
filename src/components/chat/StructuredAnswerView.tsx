@@ -8,11 +8,11 @@
  *  1. الجواب المباشر — أول شيء، قبل أي تفصيل.
  *  1م. وقائعك وأثرها القانونى — ما ذكره السائل فى الاستيضاح مطبَّقاً على النصوص (بعد الاستيضاح فقط).
  *  2. تطبيق على حالتك — خلاصة «إن كانت الواقعة كذا فالنتيجة كذا» بسندها (إن وُجدت).
- *  3. تنبيهات ومسائل مفتوحة — بارزة هنا لا فى آخر الإجابة.
- *  4. ما نحتاج منك تأكيده — الوقائع التى تُحوِّل الإجابة إلى قاطعة.
- *  5. الأحكام وسندها — كل حكم موسوم «نص» أو «تفسير» ومعه سنده وحالة المصدر
+ *  3. ما نحتاج منك تأكيده — الوقائع التى تُحوِّل الإجابة إلى قاطعة.
+ *  4. الأحكام وسندها — كل حكم موسوم «نص» أو «تفسير» ومعه سنده وحالة المصدر
  *     ورابط التحقق والمقتطف الحرفى (إن ثبت آلياً).
- *  6. ما لا تغطيه النصوص المتاحة.
+ *  5. ما لا تغطيه النصوص المتاحة.
+ *  6. تنبيهات ومسائل مفتوحة — فى نهاية الإجابة وقبل المصادر مباشرةً (قرار صاحب المشروع 2026-10-08).
  *  7. المصادر مجمَّعة بحسب القانون (نص المادة قابل للطى + رابط).
  *
  * لا منطق قانونى هنا: كل القيم (الوسم، حالة المصدر، التحقق من المقتطف) تأتى
@@ -436,31 +436,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 3. تنبيهات ومسائل مفتوحة — بارزة */}
-      {hasAlerts ? (
-        <section aria-label="تنبيهات ومسائل مفتوحة" className="rounded-lg border border-warning bg-warning-soft p-4">
-          {structured.warnings.length > 0 ? (
-            <div>
-              <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-                <span>تنبيهات</span>
-              </h3>
-              <BulletList items={structured.warnings} />
-            </div>
-          ) : null}
-          {structured.open_issues.length > 0 ? (
-            <div className={structured.warnings.length > 0 ? 'mt-4' : undefined}>
-              <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
-                <HelpCircle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-                <span>مسائل مفتوحة</span>
-              </h3>
-              <BulletList items={structured.open_issues} />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {/* 4. وقائع تحتاج تأكيدك */}
+      {/* 3. وقائع تحتاج تأكيدك */}
       {structured.facts_to_confirm.length > 0 ? (
         <section aria-label="ما نحتاج منك تأكيده" className="rounded-lg border border-border-default bg-surface p-4">
           <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
@@ -471,7 +447,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 5. الأحكام وسندها */}
+      {/* 4. الأحكام وسندها */}
       {structured.rulings.length > 0 ? (
         <section aria-label="الأحكام وسندها" className="space-y-3">
           <SectionHeading>الأحكام وسندها</SectionHeading>
@@ -492,7 +468,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 6. ما لا تغطيه النصوص */}
+      {/* 5. ما لا تغطيه النصوص */}
       {structured.not_covered.length > 0 ? (
         <section aria-label="ما لا تغطيه النصوص المتاحة" className="rounded-lg bg-surface-muted p-4">
           <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
@@ -500,6 +476,30 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
             <span>ما لا تغطيه النصوص المتاحة لدينا</span>
           </h3>
           <BulletList items={structured.not_covered} />
+        </section>
+      ) : null}
+
+      {/* 6. تنبيهات ومسائل مفتوحة — فى نهاية الإجابة وقبل المصادر */}
+      {hasAlerts ? (
+        <section aria-label="تنبيهات ومسائل مفتوحة" className="rounded-lg border border-warning bg-warning-soft p-4">
+          {structured.warnings.length > 0 ? (
+            <div>
+              <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+                <span>تنبيهات</span>
+              </h3>
+              <BulletList items={structured.warnings} />
+            </div>
+          ) : null}
+          {structured.open_issues.length > 0 ? (
+            <div className={structured.warnings.length > 0 ? 'mt-4' : undefined}>
+              <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
+                <HelpCircle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+                <span>مسائل مفتوحة</span>
+              </h3>
+              <BulletList items={structured.open_issues} />
+            </div>
+          ) : null}
         </section>
       ) : null}
 

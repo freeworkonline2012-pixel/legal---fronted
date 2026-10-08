@@ -56,7 +56,10 @@ describe('StructuredAnswerView', () => {
     render(<StructuredAnswerView structured={FULL} citations={CITATIONS} />);
     const html = document.body.innerHTML;
     expect(html.indexOf('تنبيهات ومسائل مفتوحة')).toBeGreaterThan(-1);
-    expect(html.indexOf('تنبيهات ومسائل مفتوحة')).toBeLessThan(html.indexOf('الأحكام وسندها'));
+    // التنبيهات فى نهاية الإجابة: بعد الأحكام (وبعد «ما لا تغطيه النصوص») وقبل المصادر مباشرةً
+    expect(html.indexOf('تنبيهات ومسائل مفتوحة')).toBeGreaterThan(html.indexOf('الأحكام وسندها'));
+    expect(html.indexOf('تنبيهات ومسائل مفتوحة')).toBeGreaterThan(html.lastIndexOf('ما لا تغطيه النصوص المتاحة'));
+    expect(html.indexOf('تنبيهات ومسائل مفتوحة')).toBeLessThan(html.indexOf('المصادر المستند إليها'));
     expect(screen.getByText('المصدر [2] غير محسوم الحالة.')).toBeInTheDocument();
     expect(screen.getByText('هل عدم التجديد إنهاء من صاحب العمل؟')).toBeInTheDocument();
   });
