@@ -13,13 +13,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles, WifiOff } from 'lucide-react';
-import type { QuestionAnswerResponse } from '@/lib/types';
+import type {
+  ClarificationAnswerPayload,
+  ClarificationRequest,
+  ClarificationState,
+  QuestionAnswerResponse,
+} from '@/lib/types';
 import { postQuestion } from '@/lib/api-client';
 import { MainSidebar } from '@/components/layout/MainSidebar';
 import { QuestionInput } from './QuestionInput';
 import { MessageBubble } from './MessageBubble';
 import { AnswerCard } from './AnswerCard';
 import { RefusalCard } from './RefusalCard';
+import { ClarificationCard } from './ClarificationCard';
 import { ProgressSteps, DEFAULT_PROGRESS_STEPS } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { SuggestedQuestion } from '@/components/ui/SuggestedQuestion';
@@ -28,15 +34,25 @@ import { Button } from '@/components/ui/Button';
 import { DEMO_SUGGESTED_QUESTIONS } from '@/lib/demo-data';
 import { useToast } from '@/components/ui/Toast';
 
-type ChatStatus = 'idle' | 'loading' | 'answered' | 'refused' | 'error';
+type ChatStatus = 'idle' | 'loading' | 'answered' | 'refused' | 'clarifying' | 'error';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
-  kind: 'text' | 'answer' | 'refusal' | 'progress';
+  kind: 'text' | 'answer' | 'refusal' | 'progress' | 'clarification';
   content: string;
   answer?: QuestionAnswerResponse;
   error?: string;
+  /** أسئلة الاستيضاح (kind='clarification') */
+  clarification?: ClarificationRequest;
+  /** أُجيبت البطاقة (إجابات) أو تُخطّيت — تُعرض للقراءة فقط */
+  clarificationResolved?: ClarificationAnswerPayload[] | 'skipped' | 'superseded';
+}
+
+/** آخر طلب أُرسل فعلياً (السؤال الأصلى + حالة الاستيضاح) — لإعادة المحاولة بنفس السياق. */
+interface LastRequest {
+  question: string;
+  clarification?: ClarificationState;
 }
 
 const PROGRESS_TICK_MS = 1400;
@@ -57,6 +73,9 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [activeConversation, setActiveConversation] = useState('conv-1');
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRequestRef = useRef<LastRequest | null>(null);
+  /** الإجابات المتراكمة عبر جولات الاستيضاح للسؤال الجارى (تُصفَّر مع كل سؤال جديد). */
+  const clarificationAnswersRef = useRef<ClarificationAnswerPayload[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
@@ -110,14 +129,49 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
       // «إعادة المحاولة» القديم يبقى بعد سؤال لاحق ناجح، ويعيد إرسال آخر سؤال
       // مستخدم (وليس السؤال الفاشل أصلاً) — سلوك مضلل. السؤال الجديد نفسه هو
       // «المحاولة» الجديدة، فتبقى الفقاعة الوحيدة للفشل الحالي إن حدث.
-      return prev.filter((message) => !message.error).concat(userMessage);
+      return prev
+        .filter((message) => !message.error)
+        .map((message) =>
+          message.kind === 'clarification' && !message.clarificationResolved
+            ? { ...message, clarificationResolved: 'superseded' as const }
+            : message,
+        )
+        .concat(userMessage);
     });
+    setInputValue('');
+    // سؤال جديد = استيضاح جديد من الصفر (أى بطاقة معلّقة قبله تُهمَل).
+    clarificationAnswersRef.current = [];
+    await send({ question: trimmed });
+  }
+
+  /**
+   * دورة الطلب الواحدة: إرسال السؤال (مع حالة الاستيضاح إن وُجدت) ثم عرض الإجابة أو الرفض أو
+   * بطاقة استيضاح جديدة. لا تُضيف فقاعة سؤال (تُضيفها ask فقط عند سؤال جديد).
+   */
+  async function send(request: LastRequest) {
+    lastRequestRef.current = request;
     setStatus('loading');
     startProgress();
-    setInputValue('');
 
     try {
-      const response = await postQuestion({ question: trimmed, conversation_id: conversationId });
+      const response = await postQuestion({
+        question: request.question,
+        conversation_id: conversationId,
+        ...(request.clarification ? { clarification: request.clarification } : {}),
+      });
+
+      if (response.clarification && response.clarification.questions.length > 0) {
+        const clarificationMessage: ChatMessage = {
+          id: `msg-${++messageCounter}`,
+          role: 'assistant',
+          kind: 'clarification',
+          content: response.answer,
+          clarification: response.clarification,
+        };
+        setMessages((prev) => [...prev, clarificationMessage]);
+        setStatus('clarifying');
+        return;
+      }
 
       const assistantMessage: ChatMessage = {
         id: `msg-${++messageCounter}`,
@@ -144,19 +198,54 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
     }
   }
 
+  /** السؤال الأصلى للاستيضاح الجارى = آخر سؤال مستخدم كتبه السائل. */
+  function currentQuestion(): string | null {
+    return lastRequestRef.current?.question ?? null;
+  }
+
+  function resolveClarification(messageId: string, resolved: ClarificationAnswerPayload[] | 'skipped') {
+    setMessages((prev) =>
+      prev.map((message) => (message.id === messageId ? { ...message, clarificationResolved: resolved } : message)),
+    );
+  }
+
+  function handleClarificationSubmit(message: ChatMessage, answers: ClarificationAnswerPayload[]) {
+    const question = currentQuestion();
+    if (!question || !message.clarification || status === 'loading') return;
+    const cumulative = [...clarificationAnswersRef.current, ...answers];
+    clarificationAnswersRef.current = cumulative;
+    resolveClarification(message.id, answers);
+    void send({ question, clarification: { round: message.clarification.round, answers: cumulative } });
+  }
+
+  function handleClarificationSkip(message: ChatMessage) {
+    const question = currentQuestion();
+    if (!question || !message.clarification || status === 'loading') return;
+    resolveClarification(message.id, 'skipped');
+    void send({
+      question,
+      clarification: {
+        round: message.clarification.round,
+        skip: true,
+        answers: clarificationAnswersRef.current,
+      },
+    });
+  }
+
   /**
    * «إعادة المحاولة» في فقاعة الخطأ — تُعيد إرسال آخر سؤال مستخدم فشل طلبه فعلياً
    * (كانت النسخة السابقة تكتفي بإعادة الحالة إلى idle دون إعادة الإرسال — سلوك
    * مخالف لتسمية الزر). تُزال فقاعة الخطأ أولاً حتى لا تتكدس الرسائل.
    */
   function handleRetry() {
-    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
-    if (!lastUserMessage) {
+    // نفس الطلب بالضبط (بما فيه حالة الاستيضاح) — لا فقاعة سؤال جديدة.
+    const lastRequest = lastRequestRef.current;
+    if (!lastRequest) {
       setStatus('idle');
       return;
     }
     setMessages((prev) => prev.filter((message) => !message.error));
-    void ask(lastUserMessage.content);
+    void send(lastRequest);
   }
 
   function handleRephrase() {
@@ -177,6 +266,8 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
         onNewConversation={() => {
           setMessages([]);
           setStatus('idle');
+          lastRequestRef.current = null;
+          clarificationAnswersRef.current = [];
           setConversationId(undefined);
           setInputValue('');
           setActiveConversation(`conv-${Date.now()}`);
@@ -228,6 +319,19 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
                     <AnswerCard
                       answer={message.answer}
                       onFollowUpClick={(question) => setInputValue(question)}
+                    />
+                  </MessageBubble>
+                );
+              }
+              if (message.kind === 'clarification' && message.clarification) {
+                return (
+                  <MessageBubble key={message.id} role="assistant">
+                    <ClarificationCard
+                      request={message.clarification}
+                      resolvedAnswers={message.clarificationResolved}
+                      disabled={status === 'loading'}
+                      onSubmit={(answers) => handleClarificationSubmit(message, answers)}
+                      onSkip={() => handleClarificationSkip(message)}
                     />
                   </MessageBubble>
                 );

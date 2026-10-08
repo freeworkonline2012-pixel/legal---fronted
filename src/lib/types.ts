@@ -134,6 +134,45 @@ export interface WebFallback {
   provider: string;
 }
 
+/** سؤال استيضاحى واحد من المنصة (يطابق ClarificationQuestionDto فى backend). */
+export interface ClarificationQuestion {
+  id: string;
+  question: string;
+  /** لماذا نسأل — جملة قصيرة تربط السؤال بتمييز تقرره النصوص */
+  why?: string | null;
+  options: string[];
+  /** true = يجوز اختيار أكثر من خيار */
+  allow_multiple: boolean;
+}
+
+/** طلب استيضاح من المنصة بدل الإجابة (يطابق ClarificationRequestDto). */
+export interface ClarificationRequest {
+  /** رقم الجولة المطلوب الإجابة عنها (تبدأ من 1) */
+  round: number;
+  max_rounds: number;
+  reason?: string | null;
+  questions: ClarificationQuestion[];
+}
+
+/** إجابة السائل عن سؤال استيضاحى: option = من الخيارات، custom = كتبها بنفسه، unknown = لا أعرف */
+export type ClarificationAnswerKind = 'option' | 'custom' | 'unknown';
+
+export interface ClarificationAnswerPayload {
+  question: string;
+  /** فارغ عند kind=unknown */
+  answer: string;
+  kind: ClarificationAnswerKind;
+}
+
+/** حالة الاستيضاح المُعادة مع الطلب التالى (الخادم عديم الحالة). */
+export interface ClarificationState {
+  /** عدد جولات الاستيضاح التى أُجيبت */
+  round: number;
+  /** true = تخطَّ الاستيضاح وأجب مباشرة */
+  skip?: boolean;
+  answers: ClarificationAnswerPayload[];
+}
+
 /** رد POST /api/questions — الحالة الطبيعية أو الرفض (refused) */
 export interface QuestionAnswerResponse {
   /** معرّف الإجابة المحفوظة — يعيده backend في AnswerResponseDto.id (عقد C-2) */
@@ -153,6 +192,8 @@ export interface QuestionAnswerResponse {
   web_fallback?: WebFallback | null;
   /** الإجابة المنظَّمة (جواب مباشر + أحكام بسندها ووسمها + تحذيرات...) — غائبة/null عند المسار النصى القديم */
   structured?: StructuredAnswer | null;
+  /** حين تحتاج المنصة توضيحات قبل الإجابة: answer جملة تمهيد وcitations فارغة ولا id */
+  clarification?: ClarificationRequest | null;
 }
 
 /** طلب POST /api/questions */
@@ -160,6 +201,8 @@ export interface QuestionRequest {
   question: string;
   /** اختياري — للأسئلة المتتابعة (F-11) */
   conversation_id?: string;
+  /** حالة الاستيضاح — غائبة فى الطلب الأول العادى */
+  clarification?: ClarificationState;
 }
 
 /** عنصر واحد في سجل «أسئلتي» (GET /api/questions/history — F-15) */
