@@ -13,6 +13,7 @@ import type {
   SourceStatusLabel,
   StructuredAnswer,
   StructuredRuling,
+  StructuredScenario,
 } from './types';
 
 const SOURCE_STATUSES: readonly SourceStatusLabel[] = ['ساري', 'معدّل', 'ملغى', 'غير محسوم'];
@@ -60,9 +61,23 @@ export function parseStructuredAnswer(raw: unknown): StructuredAnswer | null {
     }
   }
 
+  const scenarios: StructuredScenario[] = [];
+  if (Array.isArray(r.scenarios)) {
+    for (const item of r.scenarios) {
+      if (!item || typeof item !== 'object') continue;
+      const x = item as Record<string, unknown>;
+      const condition = typeof x.condition === 'string' ? x.condition.trim() : '';
+      const outcome = typeof x.outcome === 'string' ? x.outcome.trim() : '';
+      if (condition.length === 0 || outcome.length === 0) continue;
+      const idx = typeof x.citation_index === 'number' && Number.isInteger(x.citation_index) ? x.citation_index : -1;
+      scenarios.push({ condition, outcome, citation_index: idx });
+    }
+  }
+
   return {
     direct_answer: direct,
     rulings,
+    scenarios,
     warnings: strList(r.warnings),
     open_issues: strList(r.open_issues),
     facts_to_confirm: strList(r.facts_to_confirm),

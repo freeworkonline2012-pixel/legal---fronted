@@ -6,12 +6,13 @@
  *
  * الترتيب (من الأهم للأقل، ولا يتغير):
  *  1. الجواب المباشر — أول شيء، قبل أي تفصيل.
- *  2. تنبيهات ومسائل مفتوحة — بارزة هنا لا فى آخر الإجابة.
- *  3. ما نحتاج منك تأكيده — الوقائع التى تُحوِّل الإجابة إلى قاطعة.
- *  4. الأحكام وسندها — كل حكم موسوم «نص» أو «تفسير» ومعه سنده وحالة المصدر
+ *  2. تطبيق على حالتك — خلاصة «إن كانت الواقعة كذا فالنتيجة كذا» بسندها (إن وُجدت).
+ *  3. تنبيهات ومسائل مفتوحة — بارزة هنا لا فى آخر الإجابة.
+ *  4. ما نحتاج منك تأكيده — الوقائع التى تُحوِّل الإجابة إلى قاطعة.
+ *  5. الأحكام وسندها — كل حكم موسوم «نص» أو «تفسير» ومعه سنده وحالة المصدر
  *     ورابط التحقق والمقتطف الحرفى (إن ثبت آلياً).
- *  5. ما لا تغطيه النصوص المتاحة.
- *  6. المصادر مجمَّعة بحسب القانون (نص المادة قابل للطى + رابط).
+ *  6. ما لا تغطيه النصوص المتاحة.
+ *  7. المصادر مجمَّعة بحسب القانون (نص المادة قابل للطى + رابط).
  *
  * لا منطق قانونى هنا: كل القيم (الوسم، حالة المصدر، التحقق من المقتطف) تأتى
  * محسومة من الخادم؛ الواجهة تعرضها فقط وتُحصِّن نفسها من البنية الناقصة.
@@ -27,12 +28,13 @@ import {
   ClipboardCheck,
   ExternalLink,
   FileText,
+  GitBranch,
   HelpCircle,
   Lightbulb,
   Scale,
   Search,
 } from 'lucide-react';
-import type { Citation, StructuredAnswer, StructuredRuling } from '@/lib/types';
+import type { Citation, StructuredAnswer, StructuredRuling, StructuredScenario } from '@/lib/types';
 import {
   articleHref,
   buildDisplaySources,
@@ -136,6 +138,43 @@ function RulingItem({
           <span className="block text-caption font-semibold text-text-secondary">من نص المادة:</span>
           {ruling.quote}
         </blockquote>
+      ) : null}
+    </li>
+  );
+}
+
+function ScenarioItem({
+  scenario,
+  citations,
+  displayNo,
+}: {
+  scenario: StructuredScenario;
+  citations: ReadonlyArray<Citation>;
+  displayNo: number | undefined;
+}) {
+  const citation = citations[scenario.citation_index];
+  const href = citation ? articleHref(citation) : null;
+  return (
+    <li className="rounded-md border border-border-default bg-surface p-3" data-testid="scenario">
+      <p className="text-body text-text-primary">
+        <span className="font-semibold">إذا {scenario.condition}:</span> {scenario.outcome}
+      </p>
+      {citation ? (
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-text-secondary">
+          <span>
+            السند: <span className="font-semibold text-text-primary">[{displayNo ?? scenario.citation_index + 1}]</span>{' '}
+            {cleanLawName(citation.law, citation.law_year)} {citation.law_no}/{citation.law_year} — المادة {citation.article_no}
+          </span>
+          <SourceStatusChip status={sourceStatusOf(citation)} />
+          {href ? (
+            <a
+              href={href}
+              className="inline-flex min-h-[44px] items-center font-medium text-link underline decoration-link underline-offset-4 hover:text-primary-hover focus-visible:outline-none"
+            >
+              تحقق من نص المادة
+            </a>
+          ) : null}
+        </p>
       ) : null}
     </li>
   );
@@ -284,7 +323,12 @@ function SourcesSection({ display }: { display: ReturnType<typeof buildDisplaySo
 }
 
 export function StructuredAnswerView({ structured, citations }: StructuredAnswerViewProps) {
-  const display = useMemo(() => buildDisplaySources(citations, structured.rulings), [citations, structured.rulings]);
+  const scenarios = useMemo(() => structured.scenarios ?? [], [structured.scenarios]);
+  // ترقيم المصادر بترتيب ظهورها فى الصفحة: السيناريوهات (قبل الأحكام) ثم الأحكام.
+  const display = useMemo(
+    () => buildDisplaySources(citations, [...scenarios, ...structured.rulings]),
+    [citations, scenarios, structured.rulings],
+  );
   const hasAlerts = structured.warnings.length > 0 || structured.open_issues.length > 0;
 
   return (
@@ -295,7 +339,30 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         <p className="mt-1 text-body-lg font-semibold text-text-primary">{structured.direct_answer}</p>
       </section>
 
-      {/* 2. تنبيهات ومسائل مفتوحة — بارزة */}
+      {/* 2. تطبيق على حالتك */}
+      {scenarios.length > 0 ? (
+        <section aria-label="تطبيق على حالتك" className="rounded-lg border border-border-default bg-surface-muted p-4">
+          <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
+            <GitBranch className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <span>تطبيق على حالتك (بحسب وقائعها)</span>
+          </h3>
+          <p className="mt-1 text-body-sm text-text-secondary">
+            استنتاج من نص المادة المذكورة لكل احتمال، وليس نقلاً حرفياً؛ حدّد الاحتمال الذي ينطبق عليك.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {scenarios.map((scenario, index) => (
+              <ScenarioItem
+                key={`${index}-${scenario.condition}`}
+                scenario={scenario}
+                citations={citations}
+                displayNo={display.numberByOrigIndex.get(scenario.citation_index)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* 3. تنبيهات ومسائل مفتوحة — بارزة */}
       {hasAlerts ? (
         <section aria-label="تنبيهات ومسائل مفتوحة" className="rounded-lg border border-warning bg-warning-soft p-4">
           {structured.warnings.length > 0 ? (
@@ -319,7 +386,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 3. وقائع تحتاج تأكيدك */}
+      {/* 4. وقائع تحتاج تأكيدك */}
       {structured.facts_to_confirm.length > 0 ? (
         <section aria-label="ما نحتاج منك تأكيده" className="rounded-lg border border-border-default bg-surface p-4">
           <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
@@ -330,7 +397,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 4. الأحكام وسندها */}
+      {/* 5. الأحكام وسندها */}
       {structured.rulings.length > 0 ? (
         <section aria-label="الأحكام وسندها" className="space-y-3">
           <SectionHeading>الأحكام وسندها</SectionHeading>
@@ -351,7 +418,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 5. ما لا تغطيه النصوص */}
+      {/* 6. ما لا تغطيه النصوص */}
       {structured.not_covered.length > 0 ? (
         <section aria-label="ما لا تغطيه النصوص المتاحة" className="rounded-lg bg-surface-muted p-4">
           <h3 className="flex items-center gap-2 text-h4 font-semibold text-text-primary">
@@ -362,7 +429,7 @@ export function StructuredAnswerView({ structured, citations }: StructuredAnswer
         </section>
       ) : null}
 
-      {/* 6. المصادر مجمَّعة */}
+      {/* 7. المصادر مجمَّعة */}
       <SourcesSection display={display} />
     </div>
   );

@@ -91,9 +91,22 @@ export interface StructuredRuling {
  * QuestionAnswerResponse: غائبة/null عندما يرجع الخادم للمسار النصى القديم
  * (answer فقط) — الواجهة تعرض حينها الشكل القديم دون أى تغيير.
  */
+/**
+ * سيناريو تطبيقى «إن كانت الواقعة كذا فالنتيجة كذا» مستنبَط من مادة واحدة — تطبيق للنص
+ * على احتمال فى حالة السائل، لا نص حرفى ولا يُوسَم «نص» (يطابق StructuredScenarioDto).
+ */
+export interface StructuredScenario {
+  condition: string;
+  outcome: string;
+  /** فهرس (من صفر) المادة التى يُستنبَط منها السيناريو داخل citations */
+  citation_index: number;
+}
+
 export interface StructuredAnswer {
   direct_answer: string;
   rulings: StructuredRuling[];
+  /** اختيارى: غائب فى ردود الخادم الأقدم */
+  scenarios?: StructuredScenario[];
   warnings: string[];
   open_issues: string[];
   facts_to_confirm: string[];

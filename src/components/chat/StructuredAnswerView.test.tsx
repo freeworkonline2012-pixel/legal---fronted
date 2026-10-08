@@ -202,4 +202,54 @@ describe('StructuredAnswerView', () => {
     expect(screen.queryByText(/\(2003\) 12\/2003/)).not.toBeInTheDocument();
     expect(screen.getAllByText(/قانون العمل 12\/2003/).length).toBeGreaterThan(0);
   });
+
+  describe('تطبيق على حالتك (السيناريوهات)', () => {
+    const SCENARIOS = [
+      { condition: 'كانت الخدمة الإجمالية أقل من خمس سنوات', outcome: 'ينتهى العقد دون مكافأة.', citation_index: 1 },
+      { condition: 'ثبت الاستمرار دون تجديد مكتوب', outcome: 'يُعامل العقد كغير محدد المدة.', citation_index: 0 },
+    ];
+
+    it('يعرض القسم بعد الجواب المباشر وقبل التنبيهات والأحكام، مع سند كل سيناريو', () => {
+      render(<StructuredAnswerView structured={{ ...FULL, scenarios: SCENARIOS }} citations={CITATIONS} />);
+      const html = document.body.innerHTML;
+      expect(html.indexOf('الجواب المباشر')).toBeLessThan(html.indexOf('تطبيق على حالتك'));
+      expect(html.indexOf('تطبيق على حالتك')).toBeLessThan(html.indexOf('تنبيهات ومسائل مفتوحة'));
+      expect(html.indexOf('تطبيق على حالتك')).toBeLessThan(html.indexOf('الأحكام وسندها'));
+      const items = screen.getAllByTestId('scenario');
+      expect(items).toHaveLength(2);
+      expect(within(items[0]).getByText(/إذا كانت الخدمة الإجمالية أقل من خمس سنوات:/)).toBeInTheDocument();
+      expect(within(items[0]).getByText(/ينتهى العقد دون مكافأة/)).toBeInTheDocument();
+      expect(within(items[0]).getByText(/المادة 7/)).toBeInTheDocument();
+      expect(within(items[0]).getByTestId('source-status')).toHaveTextContent('غير محسوم');
+    });
+
+    it('يرقّم المصادر بترتيب ظهورها فى الصفحة: السيناريوهات أولاً', () => {
+      render(<StructuredAnswerView structured={{ ...FULL, scenarios: SCENARIOS }} citations={CITATIONS} />);
+      const items = screen.getAllByTestId('scenario');
+      expect(within(items[0]).getByText('[1]')).toBeInTheDocument();
+      expect(within(items[1]).getByText('[2]')).toBeInTheDocument();
+      // حكم الأحكام الأول يستند إلى citations[0] الذى صار رقمه [2]
+      expect(within(screen.getAllByTestId('ruling')[0]).getByText('[2]')).toBeInTheDocument();
+    });
+
+    it('يوضح أن السيناريو استنتاج لا نقل حرفى، ولا وسم نص/تفسير داخل السيناريو', () => {
+      render(<StructuredAnswerView structured={{ ...FULL, scenarios: SCENARIOS }} citations={CITATIONS} />);
+      expect(screen.getByText(/استنتاج من نص المادة المذكورة لكل احتمال/)).toBeInTheDocument();
+      for (const item of screen.getAllByTestId('scenario')) {
+        expect(within(item).queryByTestId('ruling-kind')).not.toBeInTheDocument();
+      }
+    });
+
+    it('بلا سيناريوهات لا يظهر القسم، وسند خارج النطاق لا ينهار', () => {
+      const { rerender } = render(<StructuredAnswerView structured={FULL} citations={CITATIONS} />);
+      expect(screen.queryByText('تطبيق على حالتك (بحسب وقائعها)')).not.toBeInTheDocument();
+      rerender(
+        <StructuredAnswerView
+          structured={{ ...FULL, scenarios: [{ condition: 'شرط ما هنا', outcome: 'نتيجة ما هنا', citation_index: 9 }] }}
+          citations={CITATIONS}
+        />,
+      );
+      expect(screen.getByTestId('scenario')).toBeInTheDocument();
+    });
+  });
 });

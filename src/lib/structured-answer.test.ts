@@ -23,6 +23,7 @@ describe('parseStructuredAnswer', () => {
     expect(v).toEqual({
       direct_answer: 'نعم.',
       rulings: [],
+      scenarios: [],
       warnings: [],
       open_issues: [],
       facts_to_confirm: [],
@@ -65,6 +66,36 @@ describe('parseStructuredAnswer', () => {
     });
     expect(v?.warnings).toEqual(['تنبيه']);
     expect(v?.open_issues).toEqual([]);
+  });
+});
+
+describe('parseStructuredAnswer — السيناريوهات التطبيقية', () => {
+  const base = { direct_answer: 'جواب.', rulings: [] };
+
+  it('تغيب scenarios فى ردود الخادم الأقدم فتصير مصفوفة فارغة', () => {
+    expect(parseStructuredAnswer(base)?.scenarios).toEqual([]);
+  });
+
+  it('يقبل السيناريو السليم ويُسقط الفاسد وحده ويصحّح الفهرس غير الصحيح إلى -1', () => {
+    const r = parseStructuredAnswer({
+      ...base,
+      scenarios: [
+        { condition: ' إذا كانت الخدمة أقل من خمس سنوات ', outcome: 'لا مكافأة', citation_index: 2 },
+        { condition: '', outcome: 'بلا شرط', citation_index: 0 },
+        { condition: 'بلا نتيجة', outcome: '   ', citation_index: 0 },
+        'نص عشوائى',
+        null,
+        { condition: 'فهرس نصى', outcome: 'نتيجة', citation_index: '1' },
+      ],
+    });
+    expect(r?.scenarios).toEqual([
+      { condition: 'إذا كانت الخدمة أقل من خمس سنوات', outcome: 'لا مكافأة', citation_index: 2 },
+      { condition: 'فهرس نصى', outcome: 'نتيجة', citation_index: -1 },
+    ]);
+  });
+
+  it('scenarios ليست مصفوفة لا تُسقط الإجابة', () => {
+    expect(parseStructuredAnswer({ ...base, scenarios: 'x' })?.scenarios).toEqual([]);
   });
 });
 
