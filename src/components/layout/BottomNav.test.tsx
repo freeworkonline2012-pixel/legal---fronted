@@ -27,6 +27,7 @@ describe('BottomNav', () => {
     expect(screen.getByRole('link', { name: 'الأدلة' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الحوكمة' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'العقود' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'الترجمة' })).toHaveAttribute('href', '/translation');
   });
 
   it('يعلّم العنصر النشط بـ aria-current="page" فقط', () => {

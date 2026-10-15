@@ -681,3 +681,64 @@ export interface AnalyzeDocumentResponse {
   ocr: boolean;
   warnings: string[];
 }
+
+/* ------------------------------------------------------------------------ */
+/* الترجمة القانونية للعقود (الخلفية: src/translation، الهجرة 205)            */
+/* ------------------------------------------------------------------------ */
+
+export type TranslationLang = 'ar' | 'en';
+export type TranslationStatus = 'ready' | 'translating' | 'completed';
+export type TranslationLayout = 'translation' | 'bilingual';
+export type TranslationFlag = 'numbers_mismatch' | 'length_anomaly' | 'untranslated_text' | 'empty_translation';
+
+export interface TranslationProgress {
+  done_units: number;
+  total_units: number;
+  done_batches: number;
+  total_batches: number;
+}
+
+export interface TranslationFlaggedItem {
+  n: number;
+  flags: TranslationFlag[];
+  src: string;
+  tgt: string;
+}
+
+export interface TranslationNote {
+  n: number;
+  term: string;
+  note: string;
+}
+
+/** حالة مهمة ترجمة (إنشاء/خطوة/قراءة). العقد وترجمته مشفَّران ومؤقتان (48 ساعة). */
+export interface TranslationJob {
+  id: string;
+  status: TranslationStatus;
+  source_lang: TranslationLang;
+  target_lang: TranslationLang;
+  title: string;
+  contract_type: string | null;
+  detection: { lang: TranslationLang; dominant_share: number };
+  progress: TranslationProgress;
+  warnings: string[];
+  flagged: TranslationFlaggedItem[];
+  notes: TranslationNote[];
+  expires_at: string;
+  created_at: string;
+}
+
+export interface TranslationUnit {
+  n: number;
+  src: string;
+  tgt: string;
+  flags: TranslationFlag[];
+  cont: boolean;
+  edited: boolean;
+}
+
+export interface TranslationUnitsPage {
+  total: number;
+  offset: number;
+  items: TranslationUnit[];
+}

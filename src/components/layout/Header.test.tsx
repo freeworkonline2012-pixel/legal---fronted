@@ -65,6 +65,7 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'الحوكمة والالتزام' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'ترجمة العقود' })).toHaveAttribute('href', '/translation');
     // أُخفيا من القائمة العلوية بطلب صريح 2026-09-05 — الصفحتان (/login،
     // /pricing) تبقيان تعملان، فقط أُزيل الرابطان من التنقل الرئيسى.
     expect(screen.queryByRole('link', { name: 'اشترك' })).not.toBeInTheDocument();

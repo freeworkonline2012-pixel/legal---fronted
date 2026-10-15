@@ -133,6 +133,14 @@ export function Header({ showAuth = true }: HeaderProps) {
           >
             تدقيق العقود
           </Link>
+          {/* أُضيف 2026-10-16: الترجمة القانونية للعقود (عربى <-> إنجليزى) بجوار تدقيق العقود؛
+              الصفحة تتطلب حساباً وتتولى دعوة غير المسجَّل لتسجيل الدخول بنفسها. */}
+          <Link
+            href="/translation"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            ترجمة العقود
+          </Link>
           {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة الحوكمة (Service 3) —
               كانت API فقط بلا أى صفحة (Phase 3 مؤجَّلة). الرابط ظاهر عمداً بنفس
               شكل باقى القائمة (لا "تجريبي" فى نص الرابط نفسه) لأن الصفحة نفسها

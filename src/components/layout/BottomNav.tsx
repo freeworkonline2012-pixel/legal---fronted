@@ -2,7 +2,7 @@
  * مكوّن BottomNav — شريط التنقل السفلي للموبايل (component_states.md القسم 15).
  *
  * - يظهر < 1024px (يُستبدل بالشريط الجانبي على الديسكتوب).
- * - ارتفاع 64px، 4 عناصر، أهداف لمس ≥ 44×44px.
+ * - ارتفاع 64px، 7 عناصر، أهداف لمس ≥ 44×44px.
  * - عنصر نشط: لون primary + نص — لا لون وحده (WCAG 1.4.1).
  */
 
@@ -10,7 +10,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, FileCheck2, FileText, MessageSquareText, ScrollText, Scale } from 'lucide-react';
+import { BookOpen, FileCheck2, FileText, Languages, MessageSquareText, ScrollText, Scale } from 'lucide-react';
 
 // «أسئلتي» و«الخطط»/«حسابي» تتطلب تسجيل دخول — مؤجّلة خارج نطاق الإصدار الأول
 // (عامة الجمهور، بلا تسجيل دخول). استُبدلت بروابط تصفح القوانين/الأدلة الإرشادية.
@@ -26,6 +26,8 @@ const NAV_ITEMS = [
   { href: '/governance', label: 'الحوكمة', icon: ScrollText },
   { href: '/contracts', label: 'العقود', icon: FileCheck2 },
   { href: '/memos', label: 'المذكرات', icon: FileText },
+  // أُضيف 2026-10-16: الترجمة القانونية للعقود (بجوار العقود).
+  { href: '/translation', label: 'الترجمة', icon: Languages },
 ] as const;
 
 export function BottomNav() {
@@ -36,7 +38,7 @@ export function BottomNav() {
       aria-label="التنقل السفلي"
       className="fixed inset-x-0 bottom-0 z-sticky-header border-t border-border-default bg-surface md:hidden"
     >
-      <ul className="grid h-16 grid-cols-6">
+      <ul className="grid h-16 grid-cols-7">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

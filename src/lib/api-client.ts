@@ -31,6 +31,11 @@ import type {
   ReviewItem,
   ReviewListResponse,
   ReviewStatus,
+  TranslationJob,
+  TranslationLang,
+  TranslationLayout,
+  TranslationUnit,
+  TranslationUnitsPage,
   UpdateReviewPayload,
   UserResponse,
 } from './types';
@@ -529,4 +534,127 @@ export async function analyzeDocument(
     throw new ApiError(res.status, `تعذّر تحليل المستند (HTTP ${res.status}) — حاول مرة أخرى أو اكتب الوقائع يدوياً.`);
   }
   return (await res.json()) as AnalyzeDocumentResponse;
+}
+
+/* ------------------------------------------------------------------------ */
+/* الترجمة القانونية للعقود (الخلفية: src/translation)                        */
+/* ------------------------------------------------------------------------ */
+
+/** رسالة الخادم العربية إن وُجدت (الخادم يصوغ رسائل صالحة للعرض لكل حالة فشل متوقعة). */
+async function translationError(res: Response, fallback: string): Promise<ApiError> {
+  let detail: string | undefined;
+  try {
+    const body = (await res.json()) as { message?: unknown };
+    if (typeof body.message === 'string') detail = body.message;
+    else if (Array.isArray(body.message) && typeof body.message[0] === 'string') detail = body.message[0];
+  } catch {
+    // جسم غير JSON — الرسالة العامة تكفى
+  }
+  if (res.status === 401) return new ApiError(401, 'سجّل الدخول أولاً لاستخدام خدمة الترجمة.');
+  if (res.status === 413) return new ApiError(413, 'حجم الملف أكبر من المسموح (10 ميغابايت).');
+  if (res.status === 429) {
+    return new ApiError(429, detail && detail.includes('الحد اليومى') ? detail : 'طلبات كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.');
+  }
+  if (res.status === 404) return new ApiError(404, 'الترجمة غير موجودة أو انتهت صلاحيتها (تُحذف تلقائياً بعد وقت قصير).');
+  if (detail && [400, 409, 422, 502, 503].includes(res.status)) return new ApiError(res.status, detail);
+  return new ApiError(res.status, `${fallback} (HTTP ${res.status}).`);
+}
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function translationFetch(path: string, init: RequestInit, fallback: string): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/translations${path}`, {
+      ...init,
+      headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await translationError(res, fallback);
+  return res;
+}
+
+/**
+ * POST /api/translations — يرفع العقد ويفحص لغته ويجهّز المهمة (لا ترجمة بعد). الموافقة الصريحة شرط يفرضه الخادم.
+ * 422: لغة الهدف = لغة العقد / عقد ثنائى اللغة / نص غير مقروء (الرسالة من الخادم).
+ */
+export async function createTranslation(file: File, targetLang: TranslationLang, consent: boolean): Promise<TranslationJob> {
+  const form = new FormData();
+  form.append('target_lang', targetLang);
+  form.append('consent', consent ? 'true' : 'false');
+  form.append('file', file);
+  // لا نضع Content-Type: المتصفح يضبط حدود multipart بنفسه.
+  const res = await translationFetch('', { method: 'POST', body: form }, 'تعذّر بدء الترجمة');
+  return (await res.json()) as TranslationJob;
+}
+
+/** POST /api/translations/{id}/step — خطوة ترجمة واحدة (دفعة فقرات). 409 = خطوة أخرى جارية، 502 = تعذّرت الدفعة (يُعاد). */
+export async function stepTranslation(id: string): Promise<TranslationJob> {
+  const res = await translationFetch(`/${encodeURIComponent(id)}/step`, { method: 'POST' }, 'تعذّرت خطوة الترجمة');
+  return (await res.json()) as TranslationJob;
+}
+
+export async function fetchTranslation(id: string): Promise<TranslationJob> {
+  const res = await translationFetch(`/${encodeURIComponent(id)}`, {}, 'تعذّر جلب الترجمة');
+  return (await res.json()) as TranslationJob;
+}
+
+export async function fetchTranslationUnits(id: string, offset: number, limit: number): Promise<TranslationUnitsPage> {
+  const res = await translationFetch(
+    `/${encodeURIComponent(id)}/units?offset=${Math.max(0, Math.floor(offset))}&limit=${Math.floor(limit)}`,
+    {},
+    'تعذّر جلب الفقرات',
+  );
+  return (await res.json()) as TranslationUnitsPage;
+}
+
+/** PATCH /api/translations/{id}/units/{n} — تصحيح المستخدم لترجمة فقرة (يزيل وسم المراجعة). */
+export async function editTranslationUnit(id: string, n: number, text: string): Promise<TranslationUnit> {
+  const res = await translationFetch(
+    `/${encodeURIComponent(id)}/units/${Math.floor(n)}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) },
+    'تعذّر حفظ التعديل',
+  );
+  return (await res.json()) as TranslationUnit;
+}
+
+/** DELETE /api/translations/{id} — حذف فورى للعقد وترجمته من الخادم. */
+export async function deleteTranslation(id: string): Promise<void> {
+  await translationFetch(`/${encodeURIComponent(id)}`, { method: 'DELETE' }, 'تعذّر حذف الترجمة');
+}
+
+/** GET /api/translations/{id}/download — يجلب الملف ويطلق تنزيل المتصفح. */
+export async function downloadTranslation(id: string, format: ExportFormat, layout: TranslationLayout): Promise<void> {
+  const res = await translationFetch(
+    `/${encodeURIComponent(id)}/download?format=${format}&layout=${layout}`,
+    {},
+    'تعذّر تنزيل الترجمة',
+  ).catch((err: unknown) => {
+    if (err instanceof ApiError && err.status === 503 && format === 'pdf') {
+      throw new ApiError(503, 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.');
+    }
+    throw err;
+  });
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? EXPORT_FALLBACK_NAMES[format];
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
 }
