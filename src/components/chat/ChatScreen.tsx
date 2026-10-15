@@ -26,6 +26,8 @@ import { MessageBubble } from './MessageBubble';
 import { AnswerCard } from './AnswerCard';
 import { RefusalCard } from './RefusalCard';
 import { ClarificationCard } from './ClarificationCard';
+import { AttachDocument } from './AttachDocument';
+import type { AttachedDocumentMeta } from './AttachDocument';
 import { ProgressSteps, DEFAULT_PROGRESS_STEPS } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { SuggestedQuestion } from '@/components/ui/SuggestedQuestion';
@@ -47,6 +49,8 @@ interface ChatMessage {
   clarification?: ClarificationRequest;
   /** أُجيبت البطاقة (إجابات) أو تُخطّيت — تُعرض للقراءة فقط */
   clarificationResolved?: ClarificationAnswerPayload[] | 'skipped' | 'superseded';
+  /** وقائع اعتمدها السائل من مستند أرفقه مع هذا السؤال (kind='text', role='user') */
+  attachment?: AttachedDocumentMeta;
 }
 
 /** آخر طلب أُرسل فعلياً (السؤال الأصلى + حالة الاستيضاح) — لإعادة المحاولة بنفس السياق. */
@@ -77,6 +81,11 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
   /** الإجابات المتراكمة عبر جولات الاستيضاح للسؤال الجارى (تُصفَّر مع كل سؤال جديد). */
   const clarificationAnswersRef = useRef<ClarificationAnswerPayload[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  /** وقائع معتمدة من مستند مُرفق للسؤال القادم (يراجعها السائل قبل الاعتماد). */
+  const [documentFacts, setDocumentFacts] = useState<ClarificationAnswerPayload[]>([]);
+  const [documentMeta, setDocumentMeta] = useState<AttachedDocumentMeta | null>(null);
+  /** تغيير المفتاح يُعيد تهيئة مكوّن الإرفاق بعد كل إرسال */
+  const [attachKey, setAttachKey] = useState(0);
   const { showToast } = useToast();
 
   const conversations = [
@@ -122,7 +131,9 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
       role: 'user',
       kind: 'text',
       content: trimmed,
+      ...(documentMeta ? { attachment: documentMeta } : {}),
     };
+    const attachedFacts = documentFacts;
 
     setMessages((prev) => {
       // عند إرسال سؤال جديد: نُزيل فقاعات الخطأ القديمة من الخيط. كان زر
@@ -140,8 +151,15 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
     });
     setInputValue('');
     // سؤال جديد = استيضاح جديد من الصفر (أى بطاقة معلّقة قبله تُهمَل).
-    clarificationAnswersRef.current = [];
-    await send({ question: trimmed });
+    // وقائع المستند تُعامل كإجابات استيضاح سبقت السؤال: تبقى متراكمة فى جولات الاستيضاح اللاحقة.
+    clarificationAnswersRef.current = attachedFacts;
+    setDocumentFacts([]);
+    setDocumentMeta(null);
+    setAttachKey((k) => k + 1);
+    await send({
+      question: trimmed,
+      ...(attachedFacts.length > 0 ? { clarification: { round: 0, answers: attachedFacts } } : {}),
+    });
   }
 
   /**
@@ -268,6 +286,9 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
           setStatus('idle');
           lastRequestRef.current = null;
           clarificationAnswersRef.current = [];
+          setDocumentFacts([]);
+          setDocumentMeta(null);
+          setAttachKey((k) => k + 1);
           setConversationId(undefined);
           setInputValue('');
           setActiveConversation(`conv-${Date.now()}`);
@@ -310,6 +331,11 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
                 return (
                   <MessageBubble key={message.id} role="user">
                     <p className="text-body">{message.content}</p>
+                    {message.attachment ? (
+                      <p className="mt-2 text-body-sm opacity-80">
+                        أُرفق مستند{message.attachment.docType ? ` (${message.attachment.docType})` : ''} — {message.attachment.factsCount} وقائع معتمدة
+                      </p>
+                    ) : null}
                   </MessageBubble>
                 );
               }
@@ -398,6 +424,15 @@ export function ChatScreen({ initialQuestion = '' }: ChatScreenProps) {
             onValueChange={setInputValue}
             onSubmit={ask}
             loading={status === 'loading'}
+          />
+          <AttachDocument
+            key={attachKey}
+            question={inputValue}
+            disabled={status === 'loading'}
+            onChange={(facts, meta) => {
+              setDocumentFacts(facts);
+              setDocumentMeta(meta);
+            }}
           />
           <DisclaimerBanner />
         </div>

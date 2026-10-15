@@ -658,3 +658,26 @@ export interface CreateMemoResponse {
   answer: QuestionAnswerResponse;
   status: 'draft';
 }
+
+/* ------------------------------------------------------------------------ */
+/* مستندات العميل لاستيضاح السؤال (POST /api/documents/analyze)              */
+/* ------------------------------------------------------------------------ */
+
+/** واقعة مستخرجة من المستند — quote مقتطف حرفى متحقَّق منه فى الخادم */
+export interface DocumentFact {
+  label: string;
+  value: string;
+  quote: string;
+}
+
+export interface AnalyzeDocumentResponse {
+  doc_type: string;
+  facts: DocumentFact[];
+  /** أعداد البيانات الشخصية المحجوبة قبل الإرسال لأى نموذج خارجى */
+  redactions: Record<string, number>;
+  redactions_total: number;
+  truncated: boolean;
+  /** قُرئ المستند آلياً من صورة (قد تخطئ الأرقام) */
+  ocr: boolean;
+  warnings: string[];
+}

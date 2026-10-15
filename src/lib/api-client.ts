@@ -9,6 +9,7 @@
 import type {
   ArticleDetail,
   ArticleListResponse,
+  AnalyzeDocumentResponse,
   AuthResponse,
   ContractResponse,
   CreateMemoRequest,
@@ -480,4 +481,52 @@ export async function createMemo(payload: CreateMemoRequest): Promise<CreateMemo
     throw new ApiError(res.status, `تعذّر إنشاء المذكرة (HTTP ${res.status}) — حاول مرة أخرى.`);
   }
   return (await res.json()) as CreateMemoResponse;
+}
+
+/* ------------------------------------------------------------------------ */
+/* مستندات العميل لاستيضاح السؤال (الخلفية: src/documents)                    */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * POST /api/documents/analyze — يرفع المستند ويعيد وقائع مقترحة للمراجعة (لا شىء يُخزَّن فى الخادم).
+ * الموافقة الصريحة شرط يفرضه الخادم. 401 بلا جلسة، 400 نوع/موافقة، 413 حجم، 422 تعذّرت القراءة
+ * (الرسالة من الخادم)، 429 كثرة الطلبات، 503 الخدمة غير متاحة (الرسالة من الخادم).
+ */
+export async function analyzeDocument(
+  file: File,
+  consent: boolean,
+  question?: string,
+): Promise<AnalyzeDocumentResponse> {
+  const form = new FormData();
+  form.append('consent', consent ? 'true' : 'false');
+  if (question && question.trim()) form.append('question', question.trim().slice(0, 2000));
+  form.append('file', file);
+
+  // لا نضع Content-Type: المتصفح يضبط حدود multipart بنفسه.
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/documents/analyze`, { method: 'POST', headers, body: form, cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON — الرسالة العامة تكفى
+    }
+    if (res.status === 401) throw new ApiError(401, 'سجّل الدخول أولاً لإرفاق مستند.');
+    if (res.status === 413) throw new ApiError(413, 'حجم الملف أكبر من المسموح (8 ميغابايت).');
+    if (res.status === 429) throw new ApiError(429, 'طلبات كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.');
+    if ((res.status === 400 || res.status === 422 || res.status === 503) && detail) throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, `تعذّر تحليل المستند (HTTP ${res.status}) — حاول مرة أخرى أو اكتب الوقائع يدوياً.`);
+  }
+  return (await res.json()) as AnalyzeDocumentResponse;
 }
