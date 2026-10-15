@@ -24,9 +24,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileWarning, FlaskConical, LogIn, RefreshCw, ScrollText, UploadCloud, WifiOff } from 'lucide-react';
 import type { ContractResponse } from '@/lib/types';
-import { ApiError, uploadContract } from '@/lib/api-client';
-import { isAuthenticated } from '@/lib/auth';
+import { ApiError, approveContractReport, uploadContract } from '@/lib/api-client';
+import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 import { Button, ButtonLink } from '@/components/ui/Button';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
@@ -66,6 +67,8 @@ export function ContractsScreen() {
   const [result, setResult] = useState<ContractResponse | null>(null);
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [approval, setApproval] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export function ContractsScreen() {
     // hydration مباشرة تكسر تطابق SSR (نفس نمط Header.tsx).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthed(isAuthenticated());
+    setIsAdmin(getCurrentUser()?.role === 'admin');
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -128,7 +132,18 @@ export function ContractsScreen() {
     void runUpload();
   }
 
+  async function handleApprove(contractId: string) {
+    setApproval('loading');
+    try {
+      await approveContractReport(contractId);
+      setApproval('done');
+    } catch {
+      setApproval('error');
+    }
+  }
+
   function handleReset() {
+    setApproval('idle');
     setFile(null);
     setResult(null);
     setStatus('idle');
@@ -266,6 +281,38 @@ export function ContractsScreen() {
                         {result.clause_count ?? 0} بند تم استخراجه وتقييمه.
                       </p>
                     </div>
+
+                    {/* تنزيل التقرير (الهجرة 203): التقرير الآلى مسودة عمل حتى يعتمده
+                        المدير؛ قبل الاعتماد يرد الخادم 409 برسالة «قيد المراجعة البشرية»
+                        فتظهر تحت الزر (والمدير وحده يُنزِّل المسودة ويعتمدها). */}
+                    {result.status === 'processed' ? (
+                      <div className="space-y-3 rounded-lg border border-border-default bg-surface p-4">
+                        <ExportButtons kind="contracts" id={result.id} label="تنزيل تقرير المراجعة" />
+                        {isAdmin ? (
+                          <div className="flex flex-wrap items-center gap-2 border-t border-border-default pt-3">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              loading={approval === 'loading'}
+                              disabled={approval === 'loading' || approval === 'done'}
+                              onClick={() => void handleApprove(result.id)}
+                            >
+                              اعتماد التقرير للعميل
+                            </Button>
+                            {approval === 'done' ? (
+                              <span role="status" className="text-body-sm text-text-secondary">
+                                اعتُمد التقرير — صار متاحاً لصاحب العقد.
+                              </span>
+                            ) : null}
+                            {approval === 'error' ? (
+                              <span role="alert" className="text-body-sm text-error">
+                                تعذّر اعتماد التقرير — حاول مرة أخرى.
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     {result.warnings && result.warnings.length > 0 ? (
                       <div className="flex items-start gap-2 rounded-lg border border-warning bg-warning-soft px-4 py-3">

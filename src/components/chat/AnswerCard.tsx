@@ -27,6 +27,7 @@ import { parseStructuredAnswer } from '@/lib/structured-answer';
 import { CitationCard } from '@/components/ui/CitationCard';
 import { RatingControl } from '@/components/ui/RatingControl';
 import { Button } from '@/components/ui/Button';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { StructuredAnswerView } from './StructuredAnswerView';
 
 export interface AnswerCardProps {
@@ -38,6 +39,9 @@ export interface AnswerCardProps {
 
 export function AnswerCard({ answer, followUpQuestions = [], onFollowUpClick }: AnswerCardProps) {
   const answerId = answer.id;
+  // التنزيل لإجابة محفوظة (لها id) وموثَّقة بسند فقط — الرفض/بلا استشهاد لا يُنزَّل
+  // (الخادم يرفضها 409 أيضاً؛ إخفاء الزر أفضل من زر يفشل).
+  const exportable = Boolean(answerId) && !answer.refused && answer.citations.length > 0;
   const structured = useMemo(() => parseStructuredAnswer(answer.structured), [answer.structured]);
 
   return (
@@ -56,6 +60,8 @@ export function AnswerCard({ answer, followUpQuestions = [], onFollowUpClick }: 
           ))}
         </>
       )}
+
+      {exportable && answerId ? <ExportButtons kind="answers" id={answerId} label="تنزيل الإجابة" /> : null}
 
       <RatingControl
         answerId={answerId}

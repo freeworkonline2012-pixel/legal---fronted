@@ -549,6 +549,11 @@ export interface GovernanceAssessResponse {
    * verdict/legal_basis/recommendation. غائبة فى استجابات قديمة.
    */
   presentation?: GovernancePresentation | null;
+  /**
+   * معرّف التقييم المحفوظ (الهجرة 203) — يُعاد لمستخدم مسجَّل الدخول فقط؛ غائب
+   * للزائر (لا يُحفظ تقييمه) ومن ثم لا يُتاح له التنزيل. مفتاح /exports/governance/{id}.
+   */
+  assessment_id?: string;
 }
 
 /** يطابق GovernancePresentationDto فى backend */

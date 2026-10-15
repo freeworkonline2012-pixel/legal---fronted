@@ -35,6 +35,7 @@ import type { GovernanceAssessResponse, SourceStatusLabel } from '@/lib/types';
 import { ApiError, postGovernanceAssess } from '@/lib/api-client';
 import { TextArea } from '@/components/ui/TextArea';
 import { Button } from '@/components/ui/Button';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
@@ -324,6 +325,12 @@ export function GovernanceScreen() {
                 &quot;معلومات غير كافية&quot; (لا مادة كافية للاستشهاد بها).
               </p>
             )}
+
+            {/* تنزيل التقييم (الهجرة 203): assessment_id لا يُعاد إلا لمسجَّل الدخول
+                (الزائر لا يُحفظ تقييمه — تقليل بيانات 151/2020). بلا id لا يظهر شيء. */}
+            {result.assessment_id ? (
+              <ExportButtons kind="governance" id={result.assessment_id} label="تنزيل التقييم" />
+            ) : null}
           </div>
         ) : null}
       </div>

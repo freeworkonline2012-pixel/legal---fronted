@@ -344,3 +344,94 @@ export async function uploadContract(file: File): Promise<ContractResponse> {
 export async function fetchContract(id: string): Promise<ContractResponse> {
   return requestJson<ContractResponse>(`/contracts/${encodeURIComponent(id)}`);
 }
+
+/* ------------------------------------------------------------------------ */
+/* تنزيل الإجابات والتقارير كمستندات PDF/Word (الهجرة 203 فى الخلفية)         */
+/* المستند يُبنى على الخادم من سجل مملوك للمستخدم — لا يُرسَل نص من المتصفح.   */
+/* ------------------------------------------------------------------------ */
+
+export type ExportKind = 'answers' | 'governance' | 'contracts';
+export type ExportFormat = 'pdf' | 'docx';
+
+const EXPORT_FALLBACK_NAMES: Record<ExportFormat, string> = {
+  pdf: 'document.pdf',
+  docx: 'document.docx',
+};
+
+/** يستخرج اسم الملف من Content-Disposition (ASCII فقط من الخادم) أو يعيد null */
+export function parseDownloadFilename(header: string | null): string | null {
+  if (!header) return null;
+  // مُرسَّخ بنهاية القيمة: أى رمز غير [A-Za-z0-9._-] (مثل «/») يُبطل المطابقة كلها.
+  const match = /filename="?([A-Za-z0-9._-]+)"?\s*(?:;|$)/.exec(header);
+  if (!match || match[1].includes('..')) return null;
+  return match[1];
+}
+
+/** رسالة عربية مفهومة لكل حالة فشل متوقعة فى التنزيل */
+function exportErrorMessage(status: number, backendMessage: string | undefined, format: ExportFormat): string {
+  if (status === 401) return 'سجّل الدخول أولاً لتنزيل المستند.';
+  if (status === 404) return 'تعذّر العثور على هذا المستند ضمن حسابك.';
+  if (status === 409 && backendMessage) return backendMessage;
+  if (status === 429) return 'طلبات تنزيل كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.';
+  if (status === 503 && format === 'pdf') return 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.';
+  return `تعذّر تنزيل المستند (HTTP ${status}).`;
+}
+
+/**
+ * GET /api/exports/{answers|governance|contracts}/{id}?format=pdf|docx
+ * يجلب الملف مع التوكن ويطلق تنزيل المتصفح. يرمي ApiError برسالة عربية صالحة للعرض.
+ * المصادقة إلزامية؛ المالك أو admin فقط (غير ذلك 404 من الخادم).
+ */
+export async function downloadExport(kind: ExportKind, id: string, format: ExportFormat): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/exports/${kind}/${encodeURIComponent(id)}?format=${format}`, {
+      headers,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON — الرسالة العامة تكفى
+    }
+    throw new ApiError(res.status, exportErrorMessage(res.status, detail, format));
+  }
+
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? EXPORT_FALLBACK_NAMES[format];
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    // تأجيل الإلغاء حتى يبدأ المتصفح التنزيل فعلاً
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
+/** POST /api/exports/contracts/{id}/approve — اعتماد المراجعة البشرية لتقرير العقد (admin فقط) */
+export async function approveContractReport(
+  id: string,
+  note?: string,
+): Promise<{ approved_at: string; already_approved: boolean }> {
+  return requestJson<{ approved_at: string; already_approved: boolean }>(
+    `/exports/contracts/${encodeURIComponent(id)}/approve`,
+    { method: 'POST', body: JSON.stringify(note ? { note } : {}) },
+  );
+}
