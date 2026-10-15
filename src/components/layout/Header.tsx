@@ -83,8 +83,8 @@ export function Header({ showAuth = true }: HeaderProps) {
 
         <nav aria-label="التنقل الرئيسي" className="flex items-center gap-1 sm:gap-2">
           {/* ترتيب القائمة (أُعيد ترتيبه بالكامل 2026-09-05 بطلب صريح):
-              الرئيسية - القوانين - القرارات - اللوائح التنفيذية -
-              الأدلة الإرشادية - تدقيق العقود - الحوكمة والالتزام - [تبديل الوضع] -
+              الرئيسية - القوانين - القرارات - تدقيق العقود - ترجمة العقود -
+              الحوكمة والالتزام - المذكرات القانونية - [تبديل الوضع] -
               جرّب مجاناً (أو البريد/خروج عند وجود جلسة).
               تحديث لاحق (نفس اليوم 2026-09-05، بطلب صريح): "تسجيل الدخول"
               و"اشترك" أُخفيا من القائمة العلوية (راجع التعليقات عند كل منهما
@@ -109,18 +109,9 @@ export function Header({ showAuth = true }: HeaderProps) {
           >
             القرارات
           </Link>
-          <Link
-            href="/regulations"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            اللوائح التنفيذية
-          </Link>
-          <Link
-            href="/guidance"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            الأدلة الإرشادية
-          </Link>
+          {/* نُقل «اللوائح التنفيذية» و«الأدلة الإرشادية» (2026-10-16، بطلب صريح) من هذه القائمة العلوية
+              إلى «المكتبة القانونية» فى القائمة الجانبية (MainSidebar) — الصفحتان /regulations و/guidance
+              تعملان كما هما ويبقى الوصول إليهما من هناك. */}
           {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة المدقق القانونى للعقود
               (Service 2) — كانت API فقط بلا أى صفحة (Phase 3+4 مؤجَّلتان).
               بخلاف كل الروابط الأخرى هنا، هذه الصفحة تتطلب تسجيل دخول إلزامياً
@@ -161,7 +152,7 @@ export function Header({ showAuth = true }: HeaderProps) {
             href="/memos"
             className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
           >
-            المذكرات
+            المذكرات القانونية
           </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم

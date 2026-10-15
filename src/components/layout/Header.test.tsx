@@ -62,7 +62,10 @@ describe('Header', () => {
     expect(brandLink).toHaveTextContent('منصة قانونية عربية');
     expect(screen.getByRole('link', { name: 'الرئيسية' })).toHaveAttribute('href', '/chat');
     expect(screen.getByRole('link', { name: 'القوانين' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'الأدلة الإرشادية' })).toBeInTheDocument();
+    // نُقلا إلى «المكتبة القانونية» فى القائمة الجانبية (2026-10-16): لا يظهران فى القائمة العلوية.
+    expect(screen.queryByRole('link', { name: 'اللوائح التنفيذية' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'الأدلة الإرشادية' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'المذكرات القانونية' })).toHaveAttribute('href', '/memos');
     expect(screen.getByRole('link', { name: 'الحوكمة والالتزام' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'ترجمة العقود' })).toHaveAttribute('href', '/translation');
