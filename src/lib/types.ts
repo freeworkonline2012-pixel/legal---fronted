@@ -625,3 +625,36 @@ export interface ContractResponse {
   clauses?: ContractClauseItem[];
   created_at: string;
 }
+
+/* ------------------------------------------------------------------------ */
+/* المذكرات والتقارير القانونية — مسودة مقيَّدة بالمصادر (الهجرة 204)         */
+/* ------------------------------------------------------------------------ */
+
+export type MemoType = 'opinion_memo' | 'defense_memo' | 'legal_report';
+export type PartyRole = 'claimant' | 'defendant' | 'advisory';
+
+/** طلب POST /api/memos — الوقائع والطلبات تُنسخ حرفياً ولا يتحقق منها النظام */
+export interface CreateMemoRequest {
+  memo_type: MemoType;
+  party_role: PartyRole;
+  title?: string;
+  issue: string;
+  facts: string;
+  requests?: string[];
+}
+
+export interface MemoSummary {
+  id: string;
+  memo_type: MemoType;
+  party_role: PartyRole;
+  title: string;
+  answer_id: string;
+  created_at: string;
+}
+
+/** رد POST /api/memos — المذكرة مسودة دائماً (status='draft') */
+export interface CreateMemoResponse {
+  memo: MemoSummary;
+  answer: QuestionAnswerResponse;
+  status: 'draft';
+}

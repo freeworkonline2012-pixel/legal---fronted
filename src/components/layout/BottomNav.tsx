@@ -10,7 +10,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, FileCheck2, MessageSquareText, ScrollText, Scale } from 'lucide-react';
+import { BookOpen, FileCheck2, FileText, MessageSquareText, ScrollText, Scale } from 'lucide-react';
 
 // «أسئلتي» و«الخطط»/«حسابي» تتطلب تسجيل دخول — مؤجّلة خارج نطاق الإصدار الأول
 // (عامة الجمهور، بلا تسجيل دخول). استُبدلت بروابط تصفح القوانين/الأدلة الإرشادية.
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: '/guidance', label: 'الأدلة', icon: BookOpen },
   { href: '/governance', label: 'الحوكمة', icon: ScrollText },
   { href: '/contracts', label: 'العقود', icon: FileCheck2 },
+  { href: '/memos', label: 'المذكرات', icon: FileText },
 ] as const;
 
 export function BottomNav() {
@@ -35,7 +36,7 @@ export function BottomNav() {
       aria-label="التنقل السفلي"
       className="fixed inset-x-0 bottom-0 z-sticky-header border-t border-border-default bg-surface md:hidden"
     >
-      <ul className="grid h-16 grid-cols-5">
+      <ul className="grid h-16 grid-cols-6">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

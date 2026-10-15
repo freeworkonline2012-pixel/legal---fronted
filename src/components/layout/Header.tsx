@@ -147,6 +147,14 @@ export function Header({ showAuth = true }: HeaderProps) {
           >
             الحوكمة والالتزام
           </Link>
+          {/* أُضيف 2026-10-15: المذكرات والتقارير القانونية (مسودة مقيَّدة بالمصادر).
+              الصفحة تتطلب حساباً وتتولى دعوة غير المسجَّل لتسجيل الدخول بنفسها. */}
+          <Link
+            href="/memos"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
+          >
+            المذكرات
+          </Link>
           {/* روابط «أسئلتي» و«الخطط» تتطلب تسجيل دخول — مؤجّلة عمداً خارج نطاق
               الإصدار الأول (عامة الجمهور، بلا تسجيل دخول). الصفحات نفسها لم
               تُحذف وتبقى تعمل عبر الرابط المباشر — أُزيلت من التنقل الرئيسى فقط.

@@ -11,6 +11,8 @@ import type {
   ArticleListResponse,
   AuthResponse,
   ContractResponse,
+  CreateMemoRequest,
+  CreateMemoResponse,
   CountryListResponse,
   DomainKey,
   FeedbackPayload,
@@ -350,7 +352,7 @@ export async function fetchContract(id: string): Promise<ContractResponse> {
 /* المستند يُبنى على الخادم من سجل مملوك للمستخدم — لا يُرسَل نص من المتصفح.   */
 /* ------------------------------------------------------------------------ */
 
-export type ExportKind = 'answers' | 'governance' | 'contracts';
+export type ExportKind = 'answers' | 'governance' | 'contracts' | 'memos';
 export type ExportFormat = 'pdf' | 'docx';
 
 const EXPORT_FALLBACK_NAMES: Record<ExportFormat, string> = {
@@ -434,4 +436,48 @@ export async function approveContractReport(
     `/exports/contracts/${encodeURIComponent(id)}/approve`,
     { method: 'POST', body: JSON.stringify(note ? { note } : {}) },
   );
+}
+
+/* ------------------------------------------------------------------------ */
+/* المذكرات والتقارير القانونية (الهجرة 204 فى الخلفية)                       */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * POST /api/memos — مسودة مقيَّدة بالمصادر. 401 بلا جلسة، 400 تحقق مدخلات،
+ * 422 لا أسانيد موثَّقة كافية (الرسالة من الخادم وصالحة للعرض)، 429 كثرة الطلبات.
+ */
+export async function createMemo(payload: CreateMemoRequest): Promise<CreateMemoResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/memos`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON — الرسالة العامة تكفى
+    }
+    if (res.status === 401) throw new ApiError(401, 'سجّل الدخول أولاً لإنشاء مذكرة.');
+    if (res.status === 422 && detail) throw new ApiError(422, detail);
+    if (res.status === 429) {
+      throw new ApiError(429, 'طلبات كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.');
+    }
+    if (res.status === 400) throw new ApiError(400, 'بعض المدخلات غير صالحة — راجع الحقول وحاول مجدداً.');
+    throw new ApiError(res.status, `تعذّر إنشاء المذكرة (HTTP ${res.status}) — حاول مرة أخرى.`);
+  }
+  return (await res.json()) as CreateMemoResponse;
 }
