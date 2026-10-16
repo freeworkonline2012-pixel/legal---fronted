@@ -10,9 +10,10 @@
  *    للدول مستقبلاً ولا يُعرض كدولة داخل القائمة.
  *    - القوانين/القرارات: من /api/laws (kind=law، وDECISION_KINDS على التوالى).
  *    - الأدلة الإرشادية: من /api/guidance?country= — تُجلب عند فتح الدولة.
- *    - مراجع قانونية وأحكام قضائية: لا يوجد لهما بعد جدول ولا API فى الخلفية؛
- *      القائمتان موجودتان وفارغتان بحالة "ستُضاف قريباً" حتى يُرفع محتواهما
- *      (لا بيانات وهمية).
+ *    - مراجع قانونية: من /api/legal-references?country= (كتب وشروح فقه وقضاء،
+ *      migration 207) — تُجلب عند فتح الدولة، وتفتح صفحة قراءة وبحث.
+ *    - أحكام قضائية: لا يوجد لها بعد جدول ولا API فى الخلفية؛ القائمة موجودة
+ *      وفارغة بحالة "ستُضاف قريباً" حتى يُرفع محتواها (لا بيانات وهمية).
  *    كل قائمة منسدلة قابلة للتمرير مع حقل بحث عندما تطول، ورابط "عرض الكل"
  *    للصفحة الكاملة.
  *    كل الدول النشطة تُفتح بنفس الهيكل (قوائمها الفارغة تعرض "ستُضاف قريباً")؛
@@ -29,8 +30,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Clock, Globe2, Loader2, MessageSquarePlus } from 'lucide-react';
-import type { CountryItem, GuidanceListItem, LawItem } from '@/lib/types';
-import { fetchCountries, fetchGuidanceList, fetchLaws } from '@/lib/api-client';
+import type { CountryItem, GuidanceListItem, LawItem, LegalReferenceListItem } from '@/lib/types';
+import {
+  fetchCountries,
+  fetchGuidanceList,
+  fetchLaws,
+  fetchLegalReferences,
+} from '@/lib/api-client';
 import { DECISION_KINDS } from '@/lib/law-kind';
 import { isAuthenticated } from '@/lib/auth';
 
@@ -62,7 +68,9 @@ interface DropdownEntry {
   href: string;
 }
 
-type GuidanceState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; items: GuidanceListItem[] };
+type ListState<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; items: T[] };
+type GuidanceState = ListState<GuidanceListItem>;
+type ReferencesState = ListState<LegalReferenceListItem>;
 
 export function MainSidebar({
   conversations,
@@ -76,6 +84,7 @@ export function MainSidebar({
   const [lawsByCountry, setLawsByCountry] = useState<Map<string, LawItem[]>>(new Map());
   const [lawsFailed, setLawsFailed] = useState(false);
   const [guidanceByCountry, setGuidanceByCountry] = useState<Map<string, GuidanceState>>(new Map());
+  const [referencesByCountry, setReferencesByCountry] = useState<Map<string, ReferencesState>>(new Map());
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
   const [arabWorldOpen, setArabWorldOpen] = useState(true);
   const [showChats, setShowChats] = useState(false);
@@ -154,6 +163,25 @@ export function MainSidebar({
       (items) => setState({ status: 'ready', items }),
       () => {
         requestedGuidance.current.delete(code); // يسمح بإعادة المحاولة عند الفتح التالى
+        setState({ status: 'error' });
+      },
+    );
+  }, [expandedCountry]);
+
+  // المراجع القانونية: نفس نمط الأدلة (تُجلب عند أول فتح للدولة، ref لا state).
+  const requestedReferences = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!expandedCountry || requestedReferences.current.has(expandedCountry)) return;
+    const code = expandedCountry;
+    requestedReferences.current.add(code);
+    const setState = (state: ReferencesState) => {
+      if (mounted.current) setReferencesByCountry((prev) => new Map(prev).set(code, state));
+    };
+    setState({ status: 'loading' });
+    fetchAllReferences(code).then(
+      (items) => setState({ status: 'ready', items }),
+      () => {
+        requestedReferences.current.delete(code);
         setState({ status: 'error' });
       },
     );
@@ -250,6 +278,7 @@ export function MainSidebar({
                             laws={lawsByCountry.get(country.code) ?? []}
                             lawsFailed={lawsFailed}
                             guidance={guidanceByCountry.get(country.code) ?? { status: 'loading' }}
+                            references={referencesByCountry.get(country.code) ?? { status: 'loading' }}
                           />
                         ) : null}
                       </li>
@@ -350,6 +379,22 @@ async function fetchAllGuidance(country: string): Promise<GuidanceListItem[]> {
   return items;
 }
 
+/** كل مراجع دولة واحدة: الصفحة الأولى ثم الباقى بالتوازى (بحد أمان). */
+async function fetchAllReferences(country: string): Promise<LegalReferenceListItem[]> {
+  const first = await fetchLegalReferences({ country, limit: PAGE_SIZE, offset: 0 });
+  const items = [...first.items];
+  if (first.items.length === 0) return items;
+  const offsets: number[] = [];
+  for (let o = items.length; o < Math.min(first.total, MAX_FETCH_SAFETY_CAP); o += PAGE_SIZE) {
+    offsets.push(o);
+  }
+  const rest = await Promise.all(
+    offsets.map((offset) => fetchLegalReferences({ country, limit: PAGE_SIZE, offset })),
+  );
+  for (const page of rest) items.push(...page.items);
+  return items;
+}
+
 function lawEntry(law: LawItem): DropdownEntry {
   return { id: law.id, label: law.short_title || law.title, href: `/laws/${law.id}` };
 }
@@ -360,11 +405,13 @@ function CountryLibrary({
   laws,
   lawsFailed,
   guidance,
+  references,
 }: {
   countryCode: string;
   laws: LawItem[];
   lawsFailed: boolean;
   guidance: GuidanceState;
+  references: ReferencesState;
 }) {
   const lawEntries = useMemo(
     () => laws.filter((law) => law.kind === 'law').map(lawEntry),
@@ -384,6 +431,14 @@ function CountryLibrary({
         ? guidance.items.map((g) => ({ id: g.id, label: g.title, href: `/guidance/${g.id}` }))
         : [],
     [guidance],
+  );
+
+  const referenceEntries = useMemo<DropdownEntry[]>(
+    () =>
+      references.status === 'ready'
+        ? references.items.map((r) => ({ id: r.id, label: r.title, href: `/references/${r.id}` }))
+        : [],
+    [references],
   );
 
   const lawsStatus = lawsFailed ? 'error' : 'ready';
@@ -427,7 +482,12 @@ function CountryLibrary({
           />
         </li>
         <li>
-          <LibraryDropdown label="مراجع قانونية" entries={[]} status="ready" emptyText="ستُضاف قريباً" />
+          <LibraryDropdown
+            label="مراجع قانونية"
+            entries={referenceEntries}
+            status={references.status}
+            viewAllHref={`/references?country=${countryCode}`}
+          />
         </li>
         <li>
           <LibraryDropdown label="أحكام قضائية" entries={[]} status="ready" emptyText="ستُضاف قريباً" />

@@ -22,6 +22,11 @@ import type {
   GovernanceAssessResponse,
   GuidanceDetail,
   GuidanceListResponse,
+  LegalReferenceDetail,
+  LegalReferenceListResponse,
+  LegalReferenceSearchResponse,
+  LegalReferenceSection,
+  LegalReferenceType,
   LawItem,
   LawListResponse,
   LawStatusKey,
@@ -275,6 +280,56 @@ export async function fetchGuidanceList(params?: {
 /** GET /api/guidance/{id} — تفاصيل مستند إرشادى واحد (نص كامل) */
 export async function fetchGuidanceDetail(id: string): Promise<GuidanceDetail> {
   return requestJson<GuidanceDetail>(`/guidance/${encodeURIComponent(id)}`);
+}
+
+/** GET /api/legal-references — قائمة المراجع القانونية (كتب وشروح فقه وقضاء) */
+export async function fetchLegalReferences(params?: {
+  /** رمز الدولة (ISO alpha-2 أو XA = الوطن العربى) */
+  country?: string;
+  referenceType?: LegalReferenceType;
+  category?: DomainKey;
+  /** بحث فى العنوان والمؤلف */
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<LegalReferenceListResponse> {
+  const query = new URLSearchParams();
+  if (params?.country) query.set('country', params.country);
+  if (params?.referenceType) query.set('reference_type', params.referenceType);
+  if (params?.category) query.set('category', params.category);
+  if (params?.q) query.set('q', params.q);
+  query.set('limit', String(params?.limit ?? 100));
+  query.set('offset', String(params?.offset ?? 0));
+  return requestJson<LegalReferenceListResponse>(`/legal-references?${query.toString()}`);
+}
+
+/** GET /api/legal-references/search — بحث نصى كامل داخل أقسام المراجع */
+export async function searchLegalReferences(params: {
+  q: string;
+  country?: string;
+  referenceType?: LegalReferenceType;
+  limit?: number;
+  offset?: number;
+}): Promise<LegalReferenceSearchResponse> {
+  const query = new URLSearchParams();
+  query.set('q', params.q);
+  if (params.country) query.set('country', params.country);
+  if (params.referenceType) query.set('reference_type', params.referenceType);
+  query.set('limit', String(params.limit ?? 20));
+  query.set('offset', String(params.offset ?? 0));
+  return requestJson<LegalReferenceSearchResponse>(`/legal-references/search?${query.toString()}`);
+}
+
+/** GET /api/legal-references/{id} — بيانات المرجع وفهرس أقسامه */
+export async function fetchLegalReferenceDetail(id: string): Promise<LegalReferenceDetail> {
+  return requestJson<LegalReferenceDetail>(`/legal-references/${encodeURIComponent(id)}`);
+}
+
+/** GET /api/legal-references/{id}/sections/{seq} — نص قسم واحد */
+export async function fetchLegalReferenceSection(id: string, seq: number): Promise<LegalReferenceSection> {
+  return requestJson<LegalReferenceSection>(
+    `/legal-references/${encodeURIComponent(id)}/sections/${encodeURIComponent(String(seq))}`,
+  );
 }
 
 /* ------------------------------------------------------------------------ */

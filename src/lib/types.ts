@@ -469,6 +469,84 @@ export interface GuidanceDetail extends GuidanceListItem {
 }
 
 /* ------------------------------------------------------------------------ */
+/* المراجع القانونية (كتب وشروح فقه وقضاء) — يطابق LegalReference*Dto حرفياً.   */
+/* عرض وبحث فقط؛ لا تدخل محرك الإجابات (راجع backend migrations/207).         */
+/* ------------------------------------------------------------------------ */
+
+export type LegalReferenceType =
+  | 'book'
+  | 'law_commentary'
+  | 'judicial_commentary'
+  | 'fiqh'
+  | 'article'
+  | 'other';
+
+export interface LegalReferenceListItem {
+  id: string;
+  title: string;
+  author: string | null;
+  publisher: string | null;
+  edition: string | null;
+  published_year: number | null;
+  reference_type: LegalReferenceType;
+  /** ISO 3166-1 alpha-2 (أو XA = الوطن العربى) */
+  country_code: string;
+  category: string;
+  summary: string | null;
+  section_count: number;
+  created_at: string;
+}
+
+export interface LegalReferenceListResponse {
+  items: LegalReferenceListItem[];
+  total: number;
+}
+
+export interface LegalReferenceTocEntry {
+  seq: number;
+  heading: string | null;
+  page_from: number | null;
+  page_to: number | null;
+}
+
+export interface LegalReferenceDetail extends LegalReferenceListItem {
+  source_note: string | null;
+  rights_note: string | null;
+  toc: LegalReferenceTocEntry[];
+}
+
+export interface LegalReferenceSection {
+  reference_id: string;
+  reference_title: string;
+  seq: number;
+  heading: string | null;
+  page_from: number | null;
+  page_to: number | null;
+  body: string;
+  prev_seq: number | null;
+  next_seq: number | null;
+}
+
+export interface LegalReferenceSearchHit {
+  reference_id: string;
+  reference_title: string;
+  author: string | null;
+  reference_type: LegalReferenceType;
+  country_code: string;
+  seq: number;
+  heading: string | null;
+  page_from: number | null;
+  page_to: number | null;
+  /** مقتطف؛ مواضع التطابق محاطة بـ [[ ]] */
+  snippet: string;
+}
+
+export interface LegalReferenceSearchResponse {
+  items: LegalReferenceSearchHit[];
+  total: number;
+}
+
+/* ------------------------------------------------------------------------ */
 /* خدمة الحوكمة والالتزام والمخاطر (أُضيف 2026-09-05) — يطابق backend حرفياً: */
 /* AssessGovernanceDto / GovernanceVerdictResponseDto / GovernanceLegalBasisDto. */
 /* ⚠️ نقطة نهاية مستقلة عن /api/questions — عقد أضيق عمداً (بلا status/         */

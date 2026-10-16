@@ -4,7 +4,7 @@
  * يغطي:
  * - عرض شجرة الدول مع عدد القوانين؛ كل الدول النشطة تُفتح بنفس هيكل المكتبة.
  * - فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة تضم كل القوانين والقرارات
- *   والأدلة الإرشادية (روابط تفاصيل فعلية)، وقائمتين فارغتين (مراجع/أحكام).
+ *   والأدلة الإرشادية والمراجع القانونية (روابط تفاصيل فعلية)، وقائمة أحكام قضائية فارغة.
  * - "الوطن العربى" قائمة منسدلة (مفتوحة افتراضياً) تضم كل الدول؛ رمز XA لا يُعرض كدولة.
  * - اللوائح التنفيذية قائمة منسدلة تضم كل اللوائح (kind=regulation).
  * - "محادثاتى" تظهر فقط لمستخدم مسجّل دخوله (isAuthenticated فعلى عبر
@@ -23,13 +23,15 @@ jest.mock('@/lib/api-client', () => ({
   fetchCountries: jest.fn(),
   fetchLaws: jest.fn(),
   fetchGuidanceList: jest.fn(),
+  fetchLegalReferences: jest.fn(),
 }));
 
-import { fetchCountries, fetchGuidanceList, fetchLaws } from '@/lib/api-client';
+import { fetchCountries, fetchGuidanceList, fetchLaws, fetchLegalReferences } from '@/lib/api-client';
 
 const mockedFetchCountries = fetchCountries as jest.MockedFunction<typeof fetchCountries>;
 const mockedFetchLaws = fetchLaws as jest.MockedFunction<typeof fetchLaws>;
 const mockedFetchGuidance = fetchGuidanceList as jest.MockedFunction<typeof fetchGuidanceList>;
+const mockedFetchReferences = fetchLegalReferences as jest.MockedFunction<typeof fetchLegalReferences>;
 
 const SESSION: AuthResponse = {
   access_token: 'test-token',
@@ -137,6 +139,26 @@ const EG_GUIDANCE = {
   total: 1,
 };
 
+const EG_REFERENCES = {
+  items: [
+    {
+      id: 'r1',
+      title: 'شرح قانون العمل',
+      author: 'د. أحمد فؤاد',
+      publisher: null,
+      edition: null,
+      published_year: 2019,
+      reference_type: 'law_commentary' as const,
+      country_code: 'EG',
+      category: 'labor',
+      summary: null,
+      section_count: 3,
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+  total: 1,
+};
+
 function renderSidebar(props?: Partial<Parameters<typeof MainSidebar>[0]>) {
   return render(
     <MainSidebar conversations={CONVERSATIONS} {...props} />,
@@ -148,6 +170,7 @@ describe('MainSidebar', () => {
     mockedFetchCountries.mockReset().mockResolvedValue(COUNTRIES);
     mockedFetchLaws.mockReset().mockResolvedValue(EG_LAWS);
     mockedFetchGuidance.mockReset().mockResolvedValue(EG_GUIDANCE);
+    mockedFetchReferences.mockReset().mockResolvedValue(EG_REFERENCES);
     clearAuthSession();
   });
 
@@ -231,12 +254,39 @@ describe('MainSidebar', () => {
     expect(screen.getByRole('button', { name: /^القوانين/ })).toBeInTheDocument();
   });
 
-  it('مراجع قانونية وأحكام قضائية قائمتان فارغتان بحالة "ستُضاف قريباً"', async () => {
+  it('المراجع القانونية تُجلب بمعامل الدولة وتُعرض بروابط /references/{id} مع رابط عرض الكل', async () => {
     const user = userEvent.setup();
     renderSidebar();
     await user.click(await screen.findByRole('button', { name: /مصر/ }));
-    await user.click(await screen.findByRole('button', { name: /مراجع قانونية/ }));
-    expect(screen.getByText('ستُضاف قريباً')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedFetchReferences).toHaveBeenCalledWith(expect.objectContaining({ country: 'EG' })),
+    );
+    await user.click(await screen.findByRole('button', { name: /^مراجع قانونية/ }));
+
+    expect(await screen.findByRole('link', { name: 'شرح قانون العمل' })).toHaveAttribute(
+      'href',
+      '/references/r1',
+    );
+    expect(screen.getByRole('link', { name: 'عرض الكل' })).toHaveAttribute('href', '/references?country=EG');
+  });
+
+  it('فشل جلب المراجع يُظهر رسالة خطأ داخل القائمة دون كسر بقية الشجرة', async () => {
+    mockedFetchReferences.mockReset().mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^مراجع قانونية/ }));
+    expect(await screen.findByText('تعذّر التحميل حالياً.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^القوانين/ })).toBeInTheDocument();
+  });
+
+  it('دولة بلا مراجع تعرض "ستُضاف قريباً"، وأحكام قضائية تبقى فارغة', async () => {
+    mockedFetchReferences.mockReset().mockResolvedValue({ items: [], total: 0 });
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^مراجع قانونية/ }));
+    expect(await screen.findByText('ستُضاف قريباً')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /أحكام قضائية/ }));
     expect(screen.getAllByText('ستُضاف قريباً')).toHaveLength(2);
   });
@@ -285,6 +335,7 @@ describe('MainSidebar', () => {
   it('دولة بلا بيانات تُفتح بنفس هيكل مصر وقوائمها الفارغة تعرض "ستُضاف قريباً"', async () => {
     const user = userEvent.setup();
     mockedFetchGuidance.mockReset().mockResolvedValue({ items: [], total: 0 });
+    mockedFetchReferences.mockReset().mockResolvedValue({ items: [], total: 0 });
     renderSidebar();
     await user.click(await screen.findByRole('button', { name: /السعودية/ }));
 
