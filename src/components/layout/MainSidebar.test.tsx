@@ -2,7 +2,7 @@
  * اختبارات MainSidebar — "القائمة الرئيسية" (سابقاً ChatSidebar "محادثاتى").
  *
  * يغطي:
- * - عرض شجرة الدول مع عدد القوانين، وشارة "قريباً" للدول الفارغة.
+ * - عرض شجرة الدول مع عدد القوانين؛ كل الدول النشطة تُفتح بنفس هيكل المكتبة.
  * - فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة تضم كل القوانين والقرارات
  *   والأدلة الإرشادية (روابط تفاصيل فعلية)، وقائمتين فارغتين (مراجع/أحكام).
  * - "الوطن العربى" قائمة منسدلة (مفتوحة افتراضياً) تضم كل الدول؛ رمز XA لا يُعرض كدولة.
@@ -151,11 +151,12 @@ describe('MainSidebar', () => {
     clearAuthSession();
   });
 
-  it('يعرض شجرة الدول مع عدد القوانين، وشارة "قريباً" للدولة الفارغة', async () => {
+  it('يعرض كل الدول بأعدادها، ولا شارة "قريباً" على الدول النشطة الفارغة', async () => {
     renderSidebar();
     expect(await screen.findByText('مصر')).toBeInTheDocument();
     expect(screen.getByText('السعودية')).toBeInTheDocument();
-    expect(screen.getAllByText('قريباً')).toHaveLength(1); // السعودية فقط
+    expect(screen.queryByText('قريباً')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /السعودية/ })).toBeEnabled();
   });
 
   it('فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة ورابط اللوائح التنفيذية', async () => {
@@ -281,13 +282,28 @@ describe('MainSidebar', () => {
     expect(await screen.findByText('تعذّر التحميل حالياً.')).toBeInTheDocument();
   });
 
-  it('دولة "قريباً" لا تُفتح عند النقر', async () => {
+  it('دولة بلا بيانات تُفتح بنفس هيكل مصر وقوائمها الفارغة تعرض "ستُضاف قريباً"', async () => {
     const user = userEvent.setup();
+    mockedFetchGuidance.mockReset().mockResolvedValue({ items: [], total: 0 });
     renderSidebar();
-    const saudiButton = await screen.findByRole('button', { name: /السعودية/ });
-    expect(saudiButton).toBeDisabled();
-    await user.click(saudiButton);
-    expect(screen.queryByText('المكتبة القانونية')).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /السعودية/ }));
+
+    expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
+    for (const name of ['القوانين', 'القرارات', 'اللوائح التنفيذية', 'الأدلة الإرشادية', 'مراجع قانونية', 'أحكام قضائية']) {
+      expect(screen.getByRole('button', { name: new RegExp(name) })).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole('button', { name: /^القوانين/ }));
+    expect(screen.getByText('ستُضاف قريباً')).toBeInTheDocument();
+  });
+
+  it('دولة غير نشطة تبقى معطّلة بشارة "قريباً"', async () => {
+    mockedFetchCountries.mockReset().mockResolvedValue({
+      items: [{ code: 'KW', name_ar: 'الكويت', name_en: 'Kuwait', display_order: 7, is_active: false, law_count: 0 }],
+    });
+    renderSidebar();
+    const kw = await screen.findByRole('button', { name: /الكويت/ });
+    expect(kw).toBeDisabled();
+    expect(screen.getByText('قريباً')).toBeInTheDocument();
   });
 
   it('لا تظهر "محادثاتى" لزائر غير مسجّل — تظهر دعوة لتسجيل الدخول بدلاً منها', async () => {

@@ -15,7 +15,8 @@
  *      (لا بيانات وهمية).
  *    كل قائمة منسدلة قابلة للتمرير مع حقل بحث عندما تطول، ورابط "عرض الكل"
  *    للصفحة الكاملة.
- *    الدول التى لا تحتوى أى قانون تظهر بشارة "قريباً" ولا تُفتح.
+ *    كل الدول النشطة تُفتح بنفس الهيكل (قوائمها الفارغة تعرض "ستُضاف قريباً")؛
+ *    الشارة "قريباً" وتعطيل الفتح لدولة غير نشطة فقط.
  * 2. محادثاتى: تظهر فقط بعد تسجيل الدخول (isAuthenticated). ⚠️ المرحلة
  *    الحالية: هذا القسم شكلى (بيانات وهمية) — لا يوجد بعد تخزين محادثات فعلى
  *    فى الخلفية (قرار عمل موثّق: "إخفاء خلف تسجيل الدخول فقط الآن"، مرحلة
@@ -204,7 +205,9 @@ export function MainSidebar({
               <div id="arab-world-countries" className="me-2 mt-1 border-e border-border-default ps-3">
                 <ul className="space-y-1">
                   {countries.filter((c) => c.code !== ARAB_WORLD_CODE).map((country) => {
-                    const isComingSoon = country.law_count === 0 || !country.is_active;
+                    // كل الدول النشطة تُفتح بنفس هيكل المكتبة (بطلب صريح 2026-10-16) حتى لو كانت
+                    // قوائمها فارغة بعد — الشارة "قريباً" لدولة معطّلة فقط.
+                    const isComingSoon = !country.is_active;
                     const isExpanded = expandedCountry === country.code;
 
                     return (
@@ -443,7 +446,7 @@ function LibraryDropdown({
   entries,
   status,
   viewAllHref,
-  emptyText = 'لا توجد عناصر بعد',
+  emptyText = 'ستُضاف قريباً',
 }: {
   label: string;
   entries: DropdownEntry[];
