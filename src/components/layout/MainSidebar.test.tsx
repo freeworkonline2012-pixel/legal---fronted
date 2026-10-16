@@ -3,7 +3,9 @@
  *
  * يغطي:
  * - عرض شجرة الدول مع عدد القوانين، وشارة "قريباً" للدول الفارغة.
- * - فتح دولة يُظهر المجالات القانونية المتوفرة فيها بروابط /laws؟country=..
+ * - فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة تضم كل القوانين والقرارات
+ *   والأدلة الإرشادية (روابط تفاصيل فعلية)، وقائمتين فارغتين (مراجع/أحكام).
+ * - "الوطن العربى" (XA) يُفتح حتى بلا قوانين.
  * - "محادثاتى" تظهر فقط لمستخدم مسجّل دخوله (isAuthenticated فعلى عبر
  *   sessionStorage — لا mock شكلى)، وتبقى مخفية (مع دعوة لتسجيل الدخول)
  *   لزائر غير مسجّل.
@@ -19,12 +21,14 @@ import type { AuthResponse } from '@/lib/types';
 jest.mock('@/lib/api-client', () => ({
   fetchCountries: jest.fn(),
   fetchLaws: jest.fn(),
+  fetchGuidanceList: jest.fn(),
 }));
 
-import { fetchCountries, fetchLaws } from '@/lib/api-client';
+import { fetchCountries, fetchGuidanceList, fetchLaws } from '@/lib/api-client';
 
 const mockedFetchCountries = fetchCountries as jest.MockedFunction<typeof fetchCountries>;
 const mockedFetchLaws = fetchLaws as jest.MockedFunction<typeof fetchLaws>;
+const mockedFetchGuidance = fetchGuidanceList as jest.MockedFunction<typeof fetchGuidanceList>;
 
 const SESSION: AuthResponse = {
   access_token: 'test-token',
@@ -41,6 +45,7 @@ const COUNTRIES = {
   items: [
     { code: 'EG', name_ar: 'مصر', name_en: 'Egypt', display_order: 1, is_active: true, law_count: 2 },
     { code: 'SA', name_ar: 'السعودية', name_en: 'Saudi Arabia', display_order: 2, is_active: true, law_count: 0 },
+    { code: 'XA', name_ar: 'الوطن العربى', name_en: 'Arab World', display_order: 6, is_active: true, law_count: 0 },
   ],
 };
 
@@ -78,8 +83,41 @@ const EG_LAWS = {
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
     },
+    {
+      id: 'l3',
+      law_no: 100,
+      law_year: 2020,
+      title: 'قرار رئيس الوزراء بشأن اللوائح',
+      short_title: null,
+      category: 'labor',
+      kind: 'pm_decision',
+      country_code: 'EG',
+      status: 'in_force' as const,
+      official_url: null,
+      enacted_at: null,
+      last_amended_at: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
   ],
-  total: 2,
+  total: 3,
+};
+
+const EG_GUIDANCE = {
+  items: [
+    {
+      id: 'g1',
+      title: 'دليل الحوكمة الرشيدة',
+      issuing_authority: null,
+      category: 'corporate',
+      country_code: 'EG',
+      official_url: null,
+      issued_at: null,
+      related_law: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+  total: 1,
 };
 
 function renderSidebar(props?: Partial<Parameters<typeof MainSidebar>[0]>) {
@@ -92,6 +130,7 @@ describe('MainSidebar', () => {
   beforeEach(() => {
     mockedFetchCountries.mockReset().mockResolvedValue(COUNTRIES);
     mockedFetchLaws.mockReset().mockResolvedValue(EG_LAWS);
+    mockedFetchGuidance.mockReset().mockResolvedValue(EG_GUIDANCE);
     clearAuthSession();
   });
 
@@ -99,35 +138,121 @@ describe('MainSidebar', () => {
     renderSidebar();
     expect(await screen.findByText('مصر')).toBeInTheDocument();
     expect(screen.getByText('السعودية')).toBeInTheDocument();
-    expect(screen.getByText('قريباً')).toBeInTheDocument();
+    expect(screen.getAllByText('قريباً')).toHaveLength(1); // السعودية فقط (الوطن العربى مفتوح)
   });
 
-  it('فتح دولة تحتوى قوانين يُظهر تصنيف "المكتبة القانونية" ومجالاتها الفرعية', async () => {
+  it('فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة ورابط اللوائح التنفيذية', async () => {
     const user = userEvent.setup();
     renderSidebar();
-    const egyptButton = await screen.findByRole('button', { name: /مصر/ });
-    await user.click(egyptButton);
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
 
     expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'القوانين' })).toHaveAttribute(
-      'href',
-      '/laws?country=EG',
-    );
-    expect(screen.getByRole('link', { name: 'القرارات' })).toHaveAttribute(
-      'href',
-      '/decisions?country=EG',
-    );
+    for (const name of ['القوانين', 'القرارات', 'الأدلة الإرشادية', 'مراجع قانونية', 'أحكام قضائية']) {
+      expect(screen.getByRole('button', { name: new RegExp(name) })).toHaveAttribute('aria-expanded', 'false');
+    }
     expect(screen.getByRole('link', { name: 'اللوائح التنفيذية' })).toHaveAttribute(
       'href',
       '/regulations?country=EG',
     );
-    expect(screen.getByRole('link', { name: 'الأدلة الاسترشادية' })).toHaveAttribute(
-      'href',
-      '/guidance',
-    );
+    // لا روابط عناصر قبل فتح القائمة المنسدلة
+    expect(screen.queryByRole('link', { name: 'قانون العمل' })).not.toBeInTheDocument();
+  });
 
-    const laborLink = await screen.findByRole('link', { name: /قانون العمل/ });
-    expect(laborLink).toHaveAttribute('href', '/laws?country=EG&category=labor');
+  it('قائمة القوانين المنسدلة تضم كل القوانين (kind=law فقط) بروابط التفاصيل', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^القوانين/ }));
+
+    expect(screen.getByRole('link', { name: 'قانون العمل' })).toHaveAttribute('href', '/laws/l1');
+    expect(screen.getByRole('link', { name: 'قانون الإيجارات' })).toHaveAttribute('href', '/laws/l2');
+    expect(screen.queryByRole('link', { name: /قرار رئيس الوزراء/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'عرض الكل' })).toHaveAttribute('href', '/laws?country=EG');
+  });
+
+  it('قائمة القرارات المنسدلة تضم القرارات فقط', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^القرارات/ }));
+
+    expect(screen.getByRole('link', { name: /قرار رئيس الوزراء/ })).toHaveAttribute('href', '/laws/l3');
+    expect(screen.queryByRole('link', { name: 'قانون العمل' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'عرض الكل' })).toHaveAttribute('href', '/decisions?country=EG');
+  });
+
+  it('الأدلة الإرشادية تُجلب بمعامل الدولة وتُعرض بروابط /guidance/{id}', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await waitFor(() =>
+      expect(mockedFetchGuidance).toHaveBeenCalledWith(expect.objectContaining({ country: 'EG' })),
+    );
+    await user.click(await screen.findByRole('button', { name: /^الأدلة الإرشادية/ }));
+
+    expect(await screen.findByRole('link', { name: 'دليل الحوكمة الرشيدة' })).toHaveAttribute(
+      'href',
+      '/guidance/g1',
+    );
+  });
+
+  it('فشل جلب الأدلة يُظهر رسالة خطأ داخل القائمة دون كسر بقية الشجرة', async () => {
+    mockedFetchGuidance.mockReset().mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^الأدلة الإرشادية/ }));
+    expect(await screen.findByText('تعذّر التحميل حالياً.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^القوانين/ })).toBeInTheDocument();
+  });
+
+  it('مراجع قانونية وأحكام قضائية قائمتان فارغتان بحالة "ستُضاف قريباً"', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /مراجع قانونية/ }));
+    expect(screen.getByText('ستُضاف قريباً')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /أحكام قضائية/ }));
+    expect(screen.getAllByText('ستُضاف قريباً')).toHaveLength(2);
+  });
+
+  it('حقل البحث يظهر عند طول القائمة ويصفّى العناصر', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      ...EG_LAWS.items[0],
+      id: `m${i}`,
+      title: i === 5 ? 'قانون الضرائب' : `قانون رقم ${i}`,
+      short_title: null,
+    }));
+    mockedFetchLaws.mockReset().mockResolvedValue({ items: many, total: 12 });
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^القوانين/ }));
+
+    await user.type(screen.getByRole('searchbox', { name: 'بحث فى القوانين' }), 'الضرائب');
+    expect(screen.getByRole('link', { name: 'قانون الضرائب' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'قانون رقم 1' })).not.toBeInTheDocument();
+  });
+
+  it('"الوطن العربى" يُفتح رغم خلوه من القوانين ولا يحمل شارة "قريباً"', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const arabButton = await screen.findByRole('button', { name: /الوطن العربى/ });
+    expect(arabButton).toBeEnabled();
+    await user.click(arabButton);
+    expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedFetchGuidance).toHaveBeenCalledWith(expect.objectContaining({ country: 'XA' })),
+    );
+  });
+
+  it('فشل جلب القوانين لا يُسقط شجرة الدول — القائمة تُظهر رسالة خطأ', async () => {
+    mockedFetchLaws.mockReset().mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^القوانين/ }));
+    expect(await screen.findByText('تعذّر التحميل حالياً.')).toBeInTheDocument();
   });
 
   it('دولة "قريباً" لا تُفتح عند النقر', async () => {

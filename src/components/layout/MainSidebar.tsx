@@ -1,39 +1,45 @@
 /**
- * مكوّن MainSidebar — "القائمة الرئيسية" فى الشريط الجانبى (كان ChatSidebar
- * "محادثاتى" سابقاً، أُعيدت هيكلته بالكامل).
+ * مكوّن MainSidebar — "القائمة الرئيسية" فى الشريط الجانبى.
  *
- * البنية الجديدة:
- * 1. القائمة الرئيسية: شجرة تصفح بالدولة المستهدفة (مصر أولاً، ثم السعودية/
- *    الإمارات/قطر/البحرين) — كل دولة تُفتح لتُظهر تصنيف "المكتبة القانونية"
- *    (بطلب صريح 2026-09-05، يستبدل رابط "كل قوانين {الدولة}" السابق): أربعة
- *    أنواع محتوى — القوانين (وتحتها المجالات القانونية الفرعية بعددها الفعلى
- *    لكل مجال، تؤدى إلى /laws?country=..&category=..)، القرارات
- *    (/decisions?country=..)، اللوائح التنفيذية (/regulations?country=..)،
- *    والأدلة الاسترشادية (/guidance — بلا معامل دولة، لأن هذا المحتوى غير
- *    مقسَّم بالدولة بعد فى نموذج البيانات الحالى). صفحات كل نوع محتوى هى
- *    مصدر العرض الكامل فعلياً — الشريط الجانبى للتصفح لا لعرض مئات العناوين
- *    فى مساحة 280px. الدول التى لا تحتوى أى قانون مُدخَل بعد تظهر بشارة
- *    "قريباً" ولا تُفتح.
+ * 1. القائمة الرئيسية: شجرة تصفح بالدولة المستهدفة (مصر، السعودية، الإمارات،
+ *    قطر، البحرين، ثم "الوطن العربى" لما يشمل المنطقة كلها). كل دولة تُفتح لتُظهر
+ *    "المكتبة القانونية" وتحتها (بطلب صريح 2026-10-16) خمس قوائم منسدلة تضم
+ *    كل عناصرها فعلاً (لا عناوين مختارة): القوانين، القرارات، الأدلة الإرشادية،
+ *    مراجع قانونية، أحكام قضائية — إضافةً إلى رابط اللوائح التنفيذية.
+ *    - القوانين/القرارات: من /api/laws (kind=law، وDECISION_KINDS على التوالى).
+ *    - الأدلة الإرشادية: من /api/guidance?country= — تُجلب عند فتح الدولة.
+ *    - مراجع قانونية وأحكام قضائية: لا يوجد لهما بعد جدول ولا API فى الخلفية؛
+ *      القائمتان موجودتان وفارغتان بحالة "ستُضاف قريباً" حتى يُرفع محتواهما
+ *      (لا بيانات وهمية).
+ *    كل قائمة منسدلة قابلة للتمرير مع حقل بحث عندما تطول، ورابط "عرض الكل"
+ *    للصفحة الكاملة.
+ *    الدول التى لا تحتوى أى قانون تظهر بشارة "قريباً" ولا تُفتح، باستثناء
+ *    "الوطن العربى" (XA) الذى يُفتح دائماً لأنه حاوية للمحتوى العابر للدول.
  * 2. محادثاتى: تظهر فقط بعد تسجيل الدخول (isAuthenticated). ⚠️ المرحلة
  *    الحالية: هذا القسم شكلى (بيانات وهمية) — لا يوجد بعد تخزين محادثات فعلى
  *    فى الخلفية (قرار عمل موثّق: "إخفاء خلف تسجيل الدخول فقط الآن"، مرحلة
  *    تالية منفصلة لبناء جدول/API محادثات حقيقيين). الإخفاء عن الزوار غير
- *    المسجّلين حقيقى وفعلى (isAuthenticated من jwt session)، وهذا ما تغيّر
- *    فعلياً فى هذه الدفعة — لا مجرد رسم شكلى.
+ *    المسجّلين حقيقى وفعلى (isAuthenticated من jwt session).
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Clock, Globe2, Loader2, MessageSquarePlus } from 'lucide-react';
-import type { CountryItem, LawItem } from '@/lib/types';
-import { fetchCountries, fetchLaws } from '@/lib/api-client';
+import type { CountryItem, GuidanceListItem, LawItem } from '@/lib/types';
+import { fetchCountries, fetchGuidanceList, fetchLaws } from '@/lib/api-client';
+import { DECISION_KINDS } from '@/lib/law-kind';
 import { isAuthenticated } from '@/lib/auth';
-import { isDomainKey } from '@/lib/normalize';
-import { domainChipTokens } from '@/lib/tokens';
 
 const MAX_FETCH_SAFETY_CAP = 1000;
+const PAGE_SIZE = 100;
+
+/** دول تُفتح دائماً حتى بلا قوانين (حاويات المحتوى العابر للدول) — راجع migration 206. */
+const ALWAYS_OPEN_COUNTRY_CODES: readonly string[] = ['XA'];
+
+/** عدد العناصر الذى يظهر عنده حقل البحث داخل القائمة المنسدلة. */
+const FILTER_THRESHOLD = 8;
 
 export interface ChatConversation {
   id: string;
@@ -48,10 +54,13 @@ export interface MainSidebarProps {
   onNewConversation?: () => void;
 }
 
-interface CategoryCount {
-  category: string;
-  count: number;
+interface DropdownEntry {
+  id: string;
+  label: string;
+  href: string;
 }
+
+type GuidanceState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; items: GuidanceListItem[] };
 
 export function MainSidebar({
   conversations,
@@ -62,7 +71,9 @@ export function MainSidebar({
   const [countries, setCountries] = useState<CountryItem[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(true);
   const [countriesError, setCountriesError] = useState(false);
-  const [lawsByCountry, setLawsByCountry] = useState<Map<string, CategoryCount[]>>(new Map());
+  const [lawsByCountry, setLawsByCountry] = useState<Map<string, LawItem[]>>(new Map());
+  const [lawsFailed, setLawsFailed] = useState(false);
+  const [guidanceByCountry, setGuidanceByCountry] = useState<Map<string, GuidanceState>>(new Map());
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
   const [showChats, setShowChats] = useState(false);
 
@@ -83,32 +94,27 @@ export function MainSidebar({
       setCountriesLoading(true);
       setCountriesError(false);
       try {
-        const [countriesRes, laws] = await Promise.all([
-          fetchCountries(),
-          fetchAllLaws(),
-        ]);
+        // الدول هى الأساس: فشلها يعنى لا شجرة. القوانين تُجلب بالتوازى وفشلها
+        // لا يُسقط الشجرة (تظهر القوائم بحالة خطأ) — allSettled لا Promise.all.
+        const [countriesRes, lawsRes] = await Promise.allSettled([fetchCountries(), fetchAllLaws()]);
         if (cancelled) return;
-
-        setCountries(countriesRes.items);
-
-        const grouped = new Map<string, Map<string, number>>();
-        for (const law of laws) {
-          const byCategory = grouped.get(law.country_code) ?? new Map<string, number>();
-          byCategory.set(law.category, (byCategory.get(law.category) ?? 0) + 1);
-          grouped.set(law.country_code, byCategory);
+        if (countriesRes.status === 'rejected') {
+          setCountriesError(true);
+          return;
         }
-        const result = new Map<string, CategoryCount[]>();
-        for (const [countryCode, byCategory] of grouped) {
-          result.set(
-            countryCode,
-            Array.from(byCategory.entries())
-              .map(([category, count]) => ({ category, count }))
-              .sort((a, b) => b.count - a.count),
-          );
+        setCountries(countriesRes.value.items);
+
+        if (lawsRes.status === 'fulfilled') {
+          const grouped = new Map<string, LawItem[]>();
+          for (const law of lawsRes.value) {
+            const list = grouped.get(law.country_code) ?? [];
+            list.push(law);
+            grouped.set(law.country_code, list);
+          }
+          setLawsByCountry(grouped);
+        } else {
+          setLawsFailed(true);
         }
-        setLawsByCountry(result);
-      } catch {
-        if (!cancelled) setCountriesError(true);
       } finally {
         if (!cancelled) setCountriesLoading(false);
       }
@@ -120,6 +126,36 @@ export function MainSidebar({
     };
   }, []);
 
+  // الأدلة الإرشادية تُجلب عند فتح الدولة لأول مرة فقط (مخزَّنة بعدها). مفتاح
+  // "طُلبت من قبل" فى ref لا فى state: تغيّر state الخريطة لا يجب أن يُعيد
+  // تشغيل التأثير فيُلغى الطلب الجارى.
+  const requestedGuidance = useRef<Set<string>>(new Set());
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!expandedCountry || requestedGuidance.current.has(expandedCountry)) return;
+    const code = expandedCountry;
+    requestedGuidance.current.add(code);
+    const setState = (state: GuidanceState) => {
+      if (mounted.current) setGuidanceByCountry((prev) => new Map(prev).set(code, state));
+    };
+    // بدء حالة التحميل عند أول فتح للدولة.
+    setState({ status: 'loading' });
+    fetchAllGuidance(code).then(
+      (items) => setState({ status: 'ready', items }),
+      () => {
+        requestedGuidance.current.delete(code); // يسمح بإعادة المحاولة عند الفتح التالى
+        setState({ status: 'error' });
+      },
+    );
+  }, [expandedCountry]);
+
   function toggleCountry(code: string) {
     setExpandedCountry((prev) => (prev === code ? null : code));
   }
@@ -130,8 +166,6 @@ export function MainSidebar({
       className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-e border-border-default bg-surface-muted lg:flex"
     >
       <div className="px-4 pt-6">
-        {/* الوصف الفرعى "القوانين والقرارات حسب الدولة" أُزيل بطلب صريح
-            2026-09-05 — العنوان وحده كافٍ. */}
         <h2 className="text-h4 font-semibold text-text-primary">القائمة الرئيسية</h2>
       </div>
 
@@ -149,9 +183,10 @@ export function MainSidebar({
         ) : (
           <ul className="space-y-1">
             {countries.map((country) => {
-              const isComingSoon = country.law_count === 0 || !country.is_active;
+              const isComingSoon =
+                !country.is_active ||
+                (country.law_count === 0 && !ALWAYS_OPEN_COUNTRY_CODES.includes(country.code));
               const isExpanded = expandedCountry === country.code;
-              const categories = lawsByCountry.get(country.code) ?? [];
 
               return (
                 <li key={country.code}>
@@ -188,75 +223,12 @@ export function MainSidebar({
                   </button>
 
                   {isExpanded && !isComingSoon ? (
-                    /* تصنيف "المكتبة القانونية" (بطلب صريح 2026-09-05): يستبدل
-                       رابط "كل قوانين {الدولة}" السابق بعنوان قسم غير قابل
-                       للنقر، تحته أربعة أنواع محتوى: القوانين (ومجالاتها
-                       القانونية الفرعية — نفس القائمة التى كانت تظهر مباشرة
-                       سابقاً، أصبحت الآن فرعية تحت "القوانين" تحديداً بطلب
-                       صريح)، ثم القرارات، فاللوائح التنفيذية، فالأدلة
-                       الاسترشادية. الثلاثة الأولى تُمرَّر بمعامل ?country=
-                       (تدعمه فعلياً صفحات /laws و/decisions و/regulations) —
-                       أما "الأدلة الاسترشادية" فرابطها بلا معامل دولة، لأن
-                       /guidance لا تدعم بعد التصفية حسب الدولة (محتوى غير
-                       مقسَّم بالدولة فى نموذج البيانات الحالى). */
-                    <div className="me-2 mt-1 border-e border-border-default ps-3">
-                      <p className="px-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-                        المكتبة القانونية
-                      </p>
-                      <ul className="mt-0.5 space-y-0.5">
-                        <li>
-                          <Link
-                            href={`/laws?country=${country.code}`}
-                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            القوانين
-                          </Link>
-                          {categories.length > 0 ? (
-                            <ul className="me-2 mt-0.5 space-y-0.5 border-e border-border-default ps-3">
-                              {categories.map(({ category, count }) => (
-                                <li key={category}>
-                                  <Link
-                                    href={`/laws?country=${country.code}&category=${category}`}
-                                    className="flex min-h-[36px] items-center justify-between gap-2 rounded-md px-2 text-body-sm text-text-secondary hover:bg-surface hover:text-text-primary"
-                                  >
-                                    <span className="truncate">
-                                      {isDomainKey(category) ? domainChipTokens[category].label : category}
-                                    </span>
-                                    <span className="text-[11px] text-text-tertiary" dir="ltr">
-                                      {count}
-                                    </span>
-                                  </Link>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </li>
-                        <li>
-                          <Link
-                            href={`/decisions?country=${country.code}`}
-                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            القرارات
-                          </Link>
-                        </li>
-                        <li>
-                          <Link
-                            href={`/regulations?country=${country.code}`}
-                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            اللوائح التنفيذية
-                          </Link>
-                        </li>
-                        <li>
-                          <Link
-                            href="/guidance"
-                            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-                          >
-                            الأدلة الاسترشادية
-                          </Link>
-                        </li>
-                      </ul>
-                    </div>
+                    <CountryLibrary
+                      countryCode={country.code}
+                      laws={lawsByCountry.get(country.code) ?? []}
+                      lawsFailed={lawsFailed}
+                      guidance={guidanceByCountry.get(country.code) ?? { status: 'loading' }}
+                    />
                   ) : null}
                 </li>
               );
@@ -323,17 +295,217 @@ export function MainSidebar({
   );
 }
 
-/** تحميل كل القوانين (كل الدول) عبر ترقيم صفحات داخلى — نفس نمط LawsBrowser. */
+/** تحميل كل القوانين (كل الدول): الصفحة الأولى ثم الباقى بالتوازى (أسرع من التسلسل). */
 async function fetchAllLaws(): Promise<LawItem[]> {
-  const collected: LawItem[] = [];
-  let offset = 0;
-  let total = Infinity;
-  while (offset < total && collected.length < MAX_FETCH_SAFETY_CAP) {
-    const page = await fetchLaws({ limit: 100, offset });
-    collected.push(...page.items);
-    total = page.total;
-    offset += page.items.length;
-    if (page.items.length === 0) break;
+  const first = await fetchLaws({ limit: PAGE_SIZE, offset: 0 });
+  const collected = [...first.items];
+  if (first.items.length === 0) return collected; // حارس أمان — يمنع حلقة لو سلوك backend غير متوقع
+  const offsets: number[] = [];
+  for (let o = collected.length; o < Math.min(first.total, MAX_FETCH_SAFETY_CAP); o += PAGE_SIZE) {
+    offsets.push(o);
   }
+  const rest = await Promise.all(offsets.map((offset) => fetchLaws({ limit: PAGE_SIZE, offset })));
+  for (const page of rest) collected.push(...page.items);
   return collected;
+}
+
+/** كل أدلة دولة واحدة: الصفحة الأولى ثم الباقى بالتوازى (بحد أمان). */
+async function fetchAllGuidance(country: string): Promise<GuidanceListItem[]> {
+  const first = await fetchGuidanceList({ country, limit: PAGE_SIZE, offset: 0 });
+  const items = [...first.items];
+  if (first.items.length === 0) return items;
+  const offsets: number[] = [];
+  for (let o = items.length; o < Math.min(first.total, MAX_FETCH_SAFETY_CAP); o += PAGE_SIZE) {
+    offsets.push(o);
+  }
+  const rest = await Promise.all(
+    offsets.map((offset) => fetchGuidanceList({ country, limit: PAGE_SIZE, offset })),
+  );
+  for (const page of rest) items.push(...page.items);
+  return items;
+}
+
+function lawEntry(law: LawItem): DropdownEntry {
+  return { id: law.id, label: law.short_title || law.title, href: `/laws/${law.id}` };
+}
+
+/** "المكتبة القانونية" لدولة واحدة: خمس قوائم منسدلة + رابط اللوائح التنفيذية. */
+function CountryLibrary({
+  countryCode,
+  laws,
+  lawsFailed,
+  guidance,
+}: {
+  countryCode: string;
+  laws: LawItem[];
+  lawsFailed: boolean;
+  guidance: GuidanceState;
+}) {
+  const lawEntries = useMemo(
+    () => laws.filter((law) => law.kind === 'law').map(lawEntry),
+    [laws],
+  );
+  const decisionEntries = useMemo(
+    () => laws.filter((law) => DECISION_KINDS.includes(law.kind as (typeof DECISION_KINDS)[number])).map(lawEntry),
+    [laws],
+  );
+  const guidanceEntries = useMemo<DropdownEntry[]>(
+    () =>
+      guidance.status === 'ready'
+        ? guidance.items.map((g) => ({ id: g.id, label: g.title, href: `/guidance/${g.id}` }))
+        : [],
+    [guidance],
+  );
+
+  const lawsStatus = lawsFailed ? 'error' : 'ready';
+
+  return (
+    <div className="me-2 mt-1 border-e border-border-default ps-3">
+      <p className="px-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+        المكتبة القانونية
+      </p>
+      <ul className="mt-0.5 space-y-0.5">
+        <li>
+          <LibraryDropdown
+            label="القوانين"
+            entries={lawEntries}
+            status={lawsStatus}
+            viewAllHref={`/laws?country=${countryCode}`}
+          />
+        </li>
+        <li>
+          <LibraryDropdown
+            label="القرارات"
+            entries={decisionEntries}
+            status={lawsStatus}
+            viewAllHref={`/decisions?country=${countryCode}`}
+          />
+        </li>
+        <li>
+          <Link
+            href={`/regulations?country=${countryCode}`}
+            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
+          >
+            اللوائح التنفيذية
+          </Link>
+        </li>
+        <li>
+          <LibraryDropdown
+            label="الأدلة الإرشادية"
+            entries={guidanceEntries}
+            status={guidance.status}
+            viewAllHref="/guidance"
+          />
+        </li>
+        <li>
+          <LibraryDropdown label="مراجع قانونية" entries={[]} status="ready" emptyText="ستُضاف قريباً" />
+        </li>
+        <li>
+          <LibraryDropdown label="أحكام قضائية" entries={[]} status="ready" emptyText="ستُضاف قريباً" />
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * قائمة منسدلة (disclosure) تضم كل عناصر نوع محتوى: زر بالعنوان والعدد،
+ * وعند الفتح قائمة روابط قابلة للتمرير (مع بحث حين تطول) ورابط "عرض الكل".
+ */
+function LibraryDropdown({
+  label,
+  entries,
+  status,
+  viewAllHref,
+  emptyText = 'لا توجد عناصر بعد',
+}: {
+  label: string;
+  entries: DropdownEntry[];
+  status: 'loading' | 'error' | 'ready';
+  viewAllHref?: string;
+  emptyText?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const panelId = `lib-${label.replace(/\s+/g, '-')}`;
+
+  const visible = useMemo(() => {
+    const q = filter.trim();
+    return q ? entries.filter((e) => e.label.includes(q)) : entries;
+  }, [entries, filter]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-h-[36px] w-full items-center gap-2 rounded-md px-2 text-start text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:outline-none"
+      >
+        <span className="flex-1 truncate">{label}</span>
+        {status === 'ready' ? (
+          <span className="text-[11px] text-text-tertiary" dir="ltr">
+            {entries.length}
+          </span>
+        ) : null}
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 transition-transform duration-[120ms] ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open ? (
+        <div id={panelId} className="me-2 mt-0.5 border-e border-border-default ps-3">
+          {status === 'loading' ? (
+            <p className="flex items-center gap-2 px-2 py-2 text-body-sm text-text-tertiary">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              جارٍ التحميل…
+            </p>
+          ) : status === 'error' ? (
+            <p className="px-2 py-2 text-body-sm text-text-tertiary">تعذّر التحميل حالياً.</p>
+          ) : entries.length === 0 ? (
+            <p className="px-2 py-2 text-body-sm text-text-tertiary">{emptyText}</p>
+          ) : (
+            <>
+              {entries.length > FILTER_THRESHOLD ? (
+                <input
+                  type="search"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder={`بحث فى ${label}`}
+                  aria-label={`بحث فى ${label}`}
+                  className="mb-1 mt-1 w-full rounded-md border border-border-default bg-surface px-2 py-1 text-body-sm text-text-primary placeholder:text-text-tertiary focus-visible:outline-none"
+                />
+              ) : null}
+              <ul className="max-h-64 space-y-0.5 overflow-y-auto">
+                {visible.map((entry) => (
+                  <li key={entry.id}>
+                    <Link
+                      href={entry.href}
+                      title={entry.label}
+                      className="block rounded-md px-2 py-1.5 text-body-sm leading-snug text-text-secondary hover:bg-surface hover:text-text-primary"
+                    >
+                      <span className="line-clamp-2">{entry.label}</span>
+                    </Link>
+                  </li>
+                ))}
+                {visible.length === 0 ? (
+                  <li className="px-2 py-2 text-body-sm text-text-tertiary">لا نتائج مطابقة.</li>
+                ) : null}
+              </ul>
+              {viewAllHref ? (
+                <Link
+                  href={viewAllHref}
+                  className="mt-1 flex min-h-[32px] items-center rounded-md px-2 text-body-sm font-medium text-primary hover:underline"
+                >
+                  عرض الكل
+                </Link>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
 }

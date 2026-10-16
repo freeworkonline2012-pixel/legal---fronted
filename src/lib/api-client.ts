@@ -259,11 +259,14 @@ export async function fetchArticleDetail(
 /** GET /api/guidance — تصفح الأدلة والمنشورات الإرشادية غير المرقّمة */
 export async function fetchGuidanceList(params?: {
   category?: DomainKey;
+  /** رمز الدولة (ISO alpha-2 أو XA = الوطن العربى) */
+  country?: string;
   limit?: number;
   offset?: number;
 }): Promise<GuidanceListResponse> {
   const query = new URLSearchParams();
   if (params?.category) query.set('category', params.category);
+  if (params?.country) query.set('country', params.country);
   query.set('limit', String(params?.limit ?? 100));
   query.set('offset', String(params?.offset ?? 0));
   return requestJson<GuidanceListResponse>(`/guidance?${query.toString()}`);

@@ -446,6 +446,8 @@ export interface GuidanceListItem {
   title: string;
   issuing_authority: string | null;
   category: string;
+  /** ISO 3166-1 alpha-2 (أو XA = الوطن العربى) */
+  country_code: string;
   official_url: string | null;
   issued_at: string | null;
   related_law: RelatedLawSummary | null;
