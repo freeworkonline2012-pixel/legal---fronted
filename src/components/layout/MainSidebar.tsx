@@ -1,11 +1,13 @@
 /**
  * مكوّن MainSidebar — "القائمة الرئيسية" فى الشريط الجانبى.
  *
- * 1. القائمة الرئيسية: شجرة تصفح بالدولة المستهدفة (مصر، السعودية، الإمارات،
- *    قطر، البحرين، ثم "الوطن العربى" لما يشمل المنطقة كلها). كل دولة تُفتح لتُظهر
- *    "المكتبة القانونية" وتحتها (بطلب صريح 2026-10-16) خمس قوائم منسدلة تضم
- *    كل عناصرها فعلاً (لا عناوين مختارة): القوانين، القرارات، الأدلة الإرشادية،
- *    مراجع قانونية، أحكام قضائية — إضافةً إلى رابط اللوائح التنفيذية.
+ * 1. القائمة الرئيسية: قائمة منسدلة "الوطن العربى" (مفتوحة افتراضياً) تضم كل
+ *    الدول المستهدفة (مصر، السعودية، الإمارات، قطر، البحرين) — بطلب صريح
+ *    2026-10-16. كل دولة تُفتح لتُظهر "المكتبة القانونية" وتحتها ست قوائم
+ *    منسدلة تضم كل عناصرها فعلاً (لا عناوين مختارة): القوانين، القرارات،
+ *    اللوائح التنفيذية، الأدلة الإرشادية، مراجع قانونية، أحكام قضائية.
+ *    رمز XA (الوطن العربى فى جدول الدول، migration 206) محجوز للمحتوى العابر
+ *    للدول مستقبلاً ولا يُعرض كدولة داخل القائمة.
  *    - القوانين/القرارات: من /api/laws (kind=law، وDECISION_KINDS على التوالى).
  *    - الأدلة الإرشادية: من /api/guidance?country= — تُجلب عند فتح الدولة.
  *    - مراجع قانونية وأحكام قضائية: لا يوجد لهما بعد جدول ولا API فى الخلفية؛
@@ -13,8 +15,7 @@
  *      (لا بيانات وهمية).
  *    كل قائمة منسدلة قابلة للتمرير مع حقل بحث عندما تطول، ورابط "عرض الكل"
  *    للصفحة الكاملة.
- *    الدول التى لا تحتوى أى قانون تظهر بشارة "قريباً" ولا تُفتح، باستثناء
- *    "الوطن العربى" (XA) الذى يُفتح دائماً لأنه حاوية للمحتوى العابر للدول.
+ *    الدول التى لا تحتوى أى قانون تظهر بشارة "قريباً" ولا تُفتح.
  * 2. محادثاتى: تظهر فقط بعد تسجيل الدخول (isAuthenticated). ⚠️ المرحلة
  *    الحالية: هذا القسم شكلى (بيانات وهمية) — لا يوجد بعد تخزين محادثات فعلى
  *    فى الخلفية (قرار عمل موثّق: "إخفاء خلف تسجيل الدخول فقط الآن"، مرحلة
@@ -35,8 +36,8 @@ import { isAuthenticated } from '@/lib/auth';
 const MAX_FETCH_SAFETY_CAP = 1000;
 const PAGE_SIZE = 100;
 
-/** دول تُفتح دائماً حتى بلا قوانين (حاويات المحتوى العابر للدول) — راجع migration 206. */
-const ALWAYS_OPEN_COUNTRY_CODES: readonly string[] = ['XA'];
+/** رمز "الوطن العربى" فى جدول الدول (migration 206): مجموعة لا دولة، فلا تُعرض داخل قائمة الدول. */
+const ARAB_WORLD_CODE = 'XA';
 
 /** عدد العناصر الذى يظهر عنده حقل البحث داخل القائمة المنسدلة. */
 const FILTER_THRESHOLD = 8;
@@ -75,6 +76,7 @@ export function MainSidebar({
   const [lawsFailed, setLawsFailed] = useState(false);
   const [guidanceByCountry, setGuidanceByCountry] = useState<Map<string, GuidanceState>>(new Map());
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
+  const [arabWorldOpen, setArabWorldOpen] = useState(true);
   const [showChats, setShowChats] = useState(false);
 
   // isAuthenticated تعتمد على sessionStorage (غير متاح فى SSR) — تُفحص بعد
@@ -181,59 +183,79 @@ export function MainSidebar({
             تعذّر تحميل قائمة الدول حالياً.
           </p>
         ) : (
-          <ul className="space-y-1">
-            {countries.map((country) => {
-              const isComingSoon =
-                !country.is_active ||
-                (country.law_count === 0 && !ALWAYS_OPEN_COUNTRY_CODES.includes(country.code));
-              const isExpanded = expandedCountry === country.code;
+          <div>
+            <button
+              type="button"
+              aria-expanded={arabWorldOpen}
+              aria-controls="arab-world-countries"
+              onClick={() => setArabWorldOpen((v) => !v)}
+              className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 text-start text-body-sm font-semibold text-text-primary transition-colors duration-[120ms] hover:bg-surface focus-visible:outline-none"
+            >
+              <Globe2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="flex-1 truncate">الوطن العربى</span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-[120ms] ${
+                  arabWorldOpen ? 'rotate-180' : ''
+                }`}
+                aria-hidden="true"
+              />
+            </button>
+            {arabWorldOpen ? (
+              <div id="arab-world-countries" className="me-2 mt-1 border-e border-border-default ps-3">
+                <ul className="space-y-1">
+                  {countries.filter((c) => c.code !== ARAB_WORLD_CODE).map((country) => {
+                    const isComingSoon = country.law_count === 0 || !country.is_active;
+                    const isExpanded = expandedCountry === country.code;
 
-              return (
-                <li key={country.code}>
-                  <button
-                    type="button"
-                    disabled={isComingSoon}
-                    aria-expanded={isComingSoon ? undefined : isExpanded}
-                    onClick={() => !isComingSoon && toggleCountry(country.code)}
-                    className={`flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 text-start text-body-sm transition-colors duration-[120ms] focus-visible:outline-none ${
-                      isComingSoon
-                        ? 'cursor-default text-text-tertiary'
-                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                    }`}
-                  >
-                    <Globe2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span className="flex-1 truncate font-medium">{country.name_ar}</span>
-                    {isComingSoon ? (
-                      <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-text-tertiary">
-                        قريباً
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-[11px] text-text-tertiary" dir="ltr">
-                          {country.law_count}
-                        </span>
-                        <ChevronDown
-                          className={`h-4 w-4 shrink-0 transition-transform duration-[120ms] ${
-                            isExpanded ? 'rotate-180' : ''
+                    return (
+                      <li key={country.code}>
+                        <button
+                          type="button"
+                          disabled={isComingSoon}
+                          aria-expanded={isComingSoon ? undefined : isExpanded}
+                          onClick={() => !isComingSoon && toggleCountry(country.code)}
+                          className={`flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 text-start text-body-sm transition-colors duration-[120ms] focus-visible:outline-none ${
+                            isComingSoon
+                              ? 'cursor-default text-text-tertiary'
+                              : 'text-text-secondary hover:bg-surface hover:text-text-primary'
                           }`}
-                          aria-hidden="true"
-                        />
-                      </>
-                    )}
-                  </button>
+                        >
+                          <Globe2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <span className="flex-1 truncate font-medium">{country.name_ar}</span>
+                          {isComingSoon ? (
+                            <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-text-tertiary">
+                              قريباً
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-[11px] text-text-tertiary" dir="ltr">
+                                {country.law_count}
+                              </span>
+                              <ChevronDown
+                                className={`h-4 w-4 shrink-0 transition-transform duration-[120ms] ${
+                                  isExpanded ? 'rotate-180' : ''
+                                }`}
+                                aria-hidden="true"
+                              />
+                            </>
+                          )}
+                        </button>
 
-                  {isExpanded && !isComingSoon ? (
-                    <CountryLibrary
-                      countryCode={country.code}
-                      laws={lawsByCountry.get(country.code) ?? []}
-                      lawsFailed={lawsFailed}
-                      guidance={guidanceByCountry.get(country.code) ?? { status: 'loading' }}
-                    />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+                        {isExpanded && !isComingSoon ? (
+                          <CountryLibrary
+                            countryCode={country.code}
+                            laws={lawsByCountry.get(country.code) ?? []}
+                            lawsFailed={lawsFailed}
+                            guidance={guidanceByCountry.get(country.code) ?? { status: 'loading' }}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         )}
       </nav>
 
@@ -349,6 +371,10 @@ function CountryLibrary({
     () => laws.filter((law) => DECISION_KINDS.includes(law.kind as (typeof DECISION_KINDS)[number])).map(lawEntry),
     [laws],
   );
+  const regulationEntries = useMemo(
+    () => laws.filter((law) => law.kind === 'regulation').map(lawEntry),
+    [laws],
+  );
   const guidanceEntries = useMemo<DropdownEntry[]>(
     () =>
       guidance.status === 'ready'
@@ -382,12 +408,12 @@ function CountryLibrary({
           />
         </li>
         <li>
-          <Link
-            href={`/regulations?country=${countryCode}`}
-            className="flex min-h-[36px] items-center rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-          >
-            اللوائح التنفيذية
-          </Link>
+          <LibraryDropdown
+            label="اللوائح التنفيذية"
+            entries={regulationEntries}
+            status={lawsStatus}
+            viewAllHref={`/regulations?country=${countryCode}`}
+          />
         </li>
         <li>
           <LibraryDropdown

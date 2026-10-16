@@ -5,7 +5,8 @@
  * - عرض شجرة الدول مع عدد القوانين، وشارة "قريباً" للدول الفارغة.
  * - فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة تضم كل القوانين والقرارات
  *   والأدلة الإرشادية (روابط تفاصيل فعلية)، وقائمتين فارغتين (مراجع/أحكام).
- * - "الوطن العربى" (XA) يُفتح حتى بلا قوانين.
+ * - "الوطن العربى" قائمة منسدلة (مفتوحة افتراضياً) تضم كل الدول؛ رمز XA لا يُعرض كدولة.
+ * - اللوائح التنفيذية قائمة منسدلة تضم كل اللوائح (kind=regulation).
  * - "محادثاتى" تظهر فقط لمستخدم مسجّل دخوله (isAuthenticated فعلى عبر
  *   sessionStorage — لا mock شكلى)، وتبقى مخفية (مع دعوة لتسجيل الدخول)
  *   لزائر غير مسجّل.
@@ -99,8 +100,24 @@ const EG_LAWS = {
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
     },
+    {
+      id: 'l4',
+      law_no: 5,
+      law_year: 2005,
+      title: 'اللائحة التنفيذية لقانون العمل',
+      short_title: null,
+      category: 'labor',
+      kind: 'regulation',
+      country_code: 'EG',
+      status: 'in_force' as const,
+      official_url: null,
+      enacted_at: null,
+      last_amended_at: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
   ],
-  total: 3,
+  total: 4,
 };
 
 const EG_GUIDANCE = {
@@ -138,7 +155,7 @@ describe('MainSidebar', () => {
     renderSidebar();
     expect(await screen.findByText('مصر')).toBeInTheDocument();
     expect(screen.getByText('السعودية')).toBeInTheDocument();
-    expect(screen.getAllByText('قريباً')).toHaveLength(1); // السعودية فقط (الوطن العربى مفتوح)
+    expect(screen.getAllByText('قريباً')).toHaveLength(1); // السعودية فقط
   });
 
   it('فتح دولة يُظهر "المكتبة القانونية" بقوائم منسدلة ورابط اللوائح التنفيذية', async () => {
@@ -147,13 +164,9 @@ describe('MainSidebar', () => {
     await user.click(await screen.findByRole('button', { name: /مصر/ }));
 
     expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
-    for (const name of ['القوانين', 'القرارات', 'الأدلة الإرشادية', 'مراجع قانونية', 'أحكام قضائية']) {
+    for (const name of ['القوانين', 'القرارات', 'اللوائح التنفيذية', 'الأدلة الإرشادية', 'مراجع قانونية', 'أحكام قضائية']) {
       expect(screen.getByRole('button', { name: new RegExp(name) })).toHaveAttribute('aria-expanded', 'false');
     }
-    expect(screen.getByRole('link', { name: 'اللوائح التنفيذية' })).toHaveAttribute(
-      'href',
-      '/regulations?country=EG',
-    );
     // لا روابط عناصر قبل فتح القائمة المنسدلة
     expect(screen.queryByRole('link', { name: 'قانون العمل' })).not.toBeInTheDocument();
   });
@@ -179,6 +192,17 @@ describe('MainSidebar', () => {
     expect(screen.getByRole('link', { name: /قرار رئيس الوزراء/ })).toHaveAttribute('href', '/laws/l3');
     expect(screen.queryByRole('link', { name: 'قانون العمل' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'عرض الكل' })).toHaveAttribute('href', '/decisions?country=EG');
+  });
+
+  it('اللوائح التنفيذية قائمة منسدلة تضم اللوائح فقط', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(await screen.findByRole('button', { name: /مصر/ }));
+    await user.click(await screen.findByRole('button', { name: /^اللوائح التنفيذية/ }));
+
+    expect(screen.getByRole('link', { name: /اللائحة التنفيذية لقانون العمل/ })).toHaveAttribute('href', '/laws/l4');
+    expect(screen.queryByRole('link', { name: 'قانون العمل' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'عرض الكل' })).toHaveAttribute('href', '/regulations?country=EG');
   });
 
   it('الأدلة الإرشادية تُجلب بمعامل الدولة وتُعرض بروابط /guidance/{id}', async () => {
@@ -234,16 +258,18 @@ describe('MainSidebar', () => {
     expect(screen.queryByRole('link', { name: 'قانون رقم 1' })).not.toBeInTheDocument();
   });
 
-  it('"الوطن العربى" يُفتح رغم خلوه من القوانين ولا يحمل شارة "قريباً"', async () => {
+  it('"الوطن العربى" قائمة منسدلة مفتوحة افتراضياً تضم الدول، ويمكن طيّها، ولا يُعرض XA كدولة', async () => {
     const user = userEvent.setup();
     renderSidebar();
-    const arabButton = await screen.findByRole('button', { name: /الوطن العربى/ });
-    expect(arabButton).toBeEnabled();
-    await user.click(arabButton);
-    expect(await screen.findByText('المكتبة القانونية')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(mockedFetchGuidance).toHaveBeenCalledWith(expect.objectContaining({ country: 'XA' })),
-    );
+    const group = await screen.findByRole('button', { name: 'الوطن العربى' });
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /مصر/ })).toBeInTheDocument();
+    // XA موجود فى بيانات الدول لكنه لا يظهر كصف دولة (اسمه هو عنوان المجموعة فقط)
+    expect(screen.getAllByText('الوطن العربى')).toHaveLength(1);
+
+    await user.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /مصر/ })).not.toBeInTheDocument();
   });
 
   it('فشل جلب القوانين لا يُسقط شجرة الدول — القائمة تُظهر رسالة خطأ', async () => {
