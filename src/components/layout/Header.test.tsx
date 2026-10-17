@@ -107,4 +107,24 @@ describe('Header', () => {
     expect(await screen.findByRole('link', { name: 'جرّب مجاناً' })).toBeInTheDocument();
     expect(screen.queryByText('user@example.com')).not.toBeInTheDocument();
   });
+
+  it('جلسة زائر: يعرض «زائر» بدل البريد العشوائى، مع رابط تسجيل الدخول', async () => {
+    setAuthSession({
+      ...SESSION,
+      user: { ...SESSION.user, email: 'guest-9f1c@guest.invalid' },
+    });
+    renderHeader();
+    expect(await screen.findByText('زائر', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('guest-9f1c@guest.invalid')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'تسجيل الدخول' })).toHaveAttribute('href', '/login');
+    // الزائر لا زر «خروج» له (جلسته مؤقتة)؛ يبدّل الحساب عبر «تسجيل الدخول»
+    expect(screen.queryByRole('button', { name: 'خروج' })).not.toBeInTheDocument();
+  });
+
+  it('مستخدم عادى: يبقى عرض البريد كما هو (بلا «زائر»)', async () => {
+    setAuthSession(SESSION);
+    renderHeader();
+    expect(await screen.findByText('user@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('زائر')).not.toBeInTheDocument();
+  });
 });

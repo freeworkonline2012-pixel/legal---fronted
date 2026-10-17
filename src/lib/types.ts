@@ -273,6 +273,12 @@ export interface UserResponse {
   created_at: string;
 }
 
+/** رد GET /api/auth/guest-config — هل وضع الزائر (الاختبار قبل الإطلاق) مفعّل؟ */
+export interface GuestConfig {
+  enabled: boolean;
+  consent_version: string;
+}
+
 /** رد POST /api/auth/register|login — يطابق AuthResponseDto */
 export interface AuthResponse {
   access_token: string;

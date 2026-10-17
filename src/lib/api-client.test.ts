@@ -14,7 +14,9 @@
 
 import {
   ApiError,
+  createGuestSession,
   deleteQuestion,
+  fetchGuestConfig,
   fetchHealth,
   fetchMe,
   fetchQuestionHistory,
@@ -330,6 +332,38 @@ describe('api-client', () => {
         expect.stringContaining('/auth/me'),
         expect.anything(),
       );
+    });
+  });
+
+  describe('وضع الزائر — GET /auth/guest-config و POST /auth/guest', () => {
+    it('fetchGuestConfig يقرأ الإعداد من المسار العام', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({ enabled: true, consent_version: 'v1' }));
+      const cfg = await fetchGuestConfig();
+      expect(cfg).toEqual({ enabled: true, consent_version: 'v1' });
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/auth/guest-config'),
+        expect.anything(),
+      );
+    });
+
+    it('createGuestSession يرسل consent=true حرفياً ويعيد الجلسة', async () => {
+      const body = {
+        access_token: 'a',
+        refresh_token: 'r',
+        user: { id: 'g', email: 'guest-1@guest.invalid', full_name: null, role: 'user', created_at: 'x' },
+      };
+      mockFetch.mockResolvedValueOnce(jsonResponse(body, 201));
+      const res = await createGuestSession();
+      expect(res.user.email).toBe('guest-1@guest.invalid');
+      const [url, init] = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+      expect(url).toContain('/auth/guest');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body)).toEqual({ consent: true });
+    });
+
+    it('404 عند تعطيل الوضع فى الخلفية يظهر كـ ApiError(404)', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({}, 404));
+      await expect(createGuestSession()).rejects.toMatchObject({ status: 404 });
     });
   });
 

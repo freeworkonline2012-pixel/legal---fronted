@@ -43,6 +43,7 @@ import type {
   TranslationUnitsPage,
   UpdateReviewPayload,
   UserResponse,
+  GuestConfig,
 } from './types';
 import { getAccessToken } from './auth';
 
@@ -152,6 +153,23 @@ export async function loginUser(input: {
   return requestJson<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+/** GET /api/auth/guest-config — هل وضع الزائر مفعّل؟ (عام، بلا مصادقة) */
+export async function fetchGuestConfig(): Promise<GuestConfig> {
+  return requestJson<GuestConfig>('/auth/guest-config');
+}
+
+/**
+ * POST /api/auth/guest — بدء جلسة زائر مؤقتة (وضع الاختبار قبل الإطلاق التجريبى).
+ * consent=true حرفياً إلزامى (151/2020) — لا تُستدعى إلا بعد موافقة صريحة من المستخدم.
+ * 404 إن كان الوضع معطّلاً فى الخلفية.
+ */
+export async function createGuestSession(): Promise<AuthResponse> {
+  return requestJson<AuthResponse>('/auth/guest', {
+    method: 'POST',
+    body: JSON.stringify({ consent: true }),
   });
 }
 

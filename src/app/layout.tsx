@@ -4,6 +4,7 @@ import { IBM_Plex_Sans_Arabic, Noto_Naskh_Arabic } from 'next/font/google';
 import { ThemeProvider } from '@/lib/theme';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { GuestSessionBootstrap } from '@/components/layout/GuestSessionBootstrap';
 import './globals.css';
 
 /**
@@ -77,6 +78,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <ToastProvider>
             <ErrorBoundary>{children}</ErrorBoundary>
+            {/* وضع الزائر للاختبار قبل الإطلاق التجريبى: لا يُظهر شيئاً ما لم تفعّله الخلفية
+                (GUEST_ACCESS_ENABLED=true) — راجع GuestSessionBootstrap. */}
+            <GuestSessionBootstrap />
           </ToastProvider>
         </ThemeProvider>
       </body>

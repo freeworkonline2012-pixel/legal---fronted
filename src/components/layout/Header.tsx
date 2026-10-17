@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/lib/theme';
 import { ButtonLink } from '@/components/ui/Button';
 import { logoutUser } from '@/lib/api-client';
 import { clearAuthSession, getCurrentUser, getRefreshToken, isAuthenticated } from '@/lib/auth';
+import { isGuestUser } from '@/lib/guest';
 import { useToast } from '@/components/ui/Toast';
 
 export interface HeaderProps {
@@ -35,6 +36,8 @@ export function Header({ showAuth = true }: HeaderProps) {
   const { showToast } = useToast();
   const [authed, setAuthed] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  // وضع الزائر (الاختبار قبل الإطلاق التجريبى): بريد الزائر عشوائى بلا معنى، فيُعرض «زائر».
+  const [guest, setGuest] = useState(false);
 
   // قراءة حالة الجلسة بعد التحميل (client-only — تجنّب عدم تطابق SSR hydration).
   useEffect(() => {
@@ -43,6 +46,7 @@ export function Header({ showAuth = true }: HeaderProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthed(isAuthenticated());
     setUserEmail(getCurrentUser()?.email ?? null);
+    setGuest(isGuestUser(getCurrentUser()));
   }, []);
 
   async function handleLogout() {
@@ -57,6 +61,7 @@ export function Header({ showAuth = true }: HeaderProps) {
     clearAuthSession();
     setAuthed(false);
     setUserEmail(null);
+    setGuest(false);
     showToast('success', 'تم تسجيل الخروج.');
   }
 
@@ -163,19 +168,37 @@ export function Header({ showAuth = true }: HeaderProps) {
           {showAuth ? (
             authed ? (
               <div className="hidden items-center gap-2 sm:flex">
-                {userEmail ? (
+                {guest ? (
+                  <span
+                    className="whitespace-nowrap rounded-md bg-surface-muted px-2 py-1 text-caption text-text-secondary"
+                    title="وضع الاختبار المفتوح — حساب زائر مؤقت"
+                  >
+                    زائر
+                  </span>
+                ) : userEmail ? (
                   <span className="max-w-[160px] truncate text-body-sm text-text-secondary" dir="ltr">
                     {userEmail}
                   </span>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  className="inline-flex h-11 items-center gap-1 rounded-md px-3 text-body-sm font-medium text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                  خروج
-                </button>
+                {guest ? (
+                  <Link
+                    href="/login"
+                    aria-label="تسجيل الدخول"
+                    className="inline-flex h-11 items-center whitespace-nowrap rounded-md px-2 text-body-sm font-medium text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none"
+                  >
+                    دخول
+                  </Link>
+                ) : null}
+                {guest ? null : (
+                  <button
+                    type="button"
+                    onClick={() => void handleLogout()}
+                    className="inline-flex h-11 items-center gap-1 rounded-md px-3 text-body-sm font-medium text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    خروج
+                  </button>
+                )}
               </div>
             ) : (
               // إخفاء زر "تسجيل الدخول" من القائمة العلوية بطلب صريح
