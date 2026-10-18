@@ -21,8 +21,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, FileWarning, FlaskConical, LogIn, RefreshCw, ScrollText, UploadCloud, WifiOff } from 'lucide-react';
-import type { ContractResponse } from '@/lib/types';
+import { AlertTriangle, FileWarning, FlaskConical, LogIn, RefreshCw, ScrollText, UploadCloud, UserCheck, WifiOff } from 'lucide-react';
+import type { ClarificationAnswerPayload, ContractResponse } from '@/lib/types';
+import {
+  NEUTRAL_POSITION,
+  answerText,
+  clientRoleQuestion,
+  contractTypeQuestion,
+  describeContractPosition,
+  positionFromAnswers,
+  type ContractPosition,
+} from '@/lib/contract-position';
 import { ApiError, approveContractReport, uploadContract } from '@/lib/api-client';
 import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -30,6 +39,7 @@ import { ExportButtons } from '@/components/ui/ExportButtons';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
+import { ClarificationCard } from '@/components/chat/ClarificationCard';
 import { ContractClauseCard } from './ContractClauseCard';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
@@ -70,6 +80,12 @@ export function ContractsScreen() {
   const [approval, setApproval] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // الاستيضاح قبل الرفع: نوع العقد ثم صفة المستخدم فيه (نفس بطاقة استيضاح الأسئلة العامة).
+  // 'done' = حُدِّد المركز أو تُخطّى (تدقيق محايد) فيظهر نموذج الرفع.
+  const [positionPhase, setPositionPhase] = useState<'type' | 'role' | 'done'>('type');
+  const [typeAnswer, setTypeAnswer] = useState<ClarificationAnswerPayload | null>(null);
+  const [position, setPosition] = useState<ContractPosition>(NEUTRAL_POSITION);
+
   useEffect(() => {
     // متعمّد: isAuthenticated() (sessionStorage) متاح للعميل فقط؛ قراءته أثناء
     // hydration مباشرة تكسر تطابق SSR (نفس نمط Header.tsx).
@@ -107,7 +123,7 @@ export function ContractsScreen() {
     }, PROGRESS_TICK_MS);
 
     try {
-      const response = await uploadContract(file);
+      const response = await uploadContract(file, position);
       setResult(response);
       setStatus('done');
     } catch (err) {
@@ -139,6 +155,27 @@ export function ContractsScreen() {
     } catch {
       setApproval('error');
     }
+  }
+
+  function handleTypeSubmit(answers: ClarificationAnswerPayload[]) {
+    setTypeAnswer(answers[0] ?? null);
+    setPositionPhase('role');
+  }
+
+  function handleRoleSubmit(answers: ClarificationAnswerPayload[]) {
+    setPosition(positionFromAnswers(typeAnswer, answers[0] ?? null));
+    setPositionPhase('done');
+  }
+
+  function handlePositionSkip() {
+    setTypeAnswer(null);
+    setPosition(NEUTRAL_POSITION);
+    setPositionPhase('done');
+  }
+
+  function handleChangePosition() {
+    setTypeAnswer(null);
+    setPositionPhase('type');
   }
 
   function handleReset() {
@@ -195,6 +232,43 @@ export function ContractsScreen() {
         </div>
       ) : authed === true ? (
         <>
+          {positionPhase !== 'done' ? (
+            <section aria-label="مركزك فى العقد" className="mb-6 rounded-lg border border-border-default bg-surface p-5">
+              <p className="mb-4 text-body-sm text-text-secondary">
+                قبل رفع العقد: حدّد صفتك فيه لندقّقه ونقترح الصياغة من منظور مركزك.
+              </p>
+              {positionPhase === 'type' ? (
+                <ClarificationCard
+                  key="position-type"
+                  request={{ round: 1, max_rounds: 2, questions: [contractTypeQuestion()] }}
+                  onSubmit={handleTypeSubmit}
+                  onSkip={handlePositionSkip}
+                />
+              ) : (
+                <ClarificationCard
+                  key="position-role"
+                  request={{ round: 2, max_rounds: 2, questions: [clientRoleQuestion(answerText(typeAnswer))] }}
+                  onSubmit={handleRoleSubmit}
+                  onSkip={handlePositionSkip}
+                />
+              )}
+            </section>
+          ) : (
+            <>
+              <div
+                data-testid="position-banner"
+                className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-default bg-surface-muted px-4 py-3"
+              >
+                <p className="flex items-center gap-2 text-body-sm text-text-primary">
+                  <UserCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  {describeContractPosition(position)
+                    ? `نُدقّق العقد من منظور: ${describeContractPosition(position)}`
+                    : 'تدقيق محايد — لم تحدّد صفتك فى العقد.'}
+                </p>
+                <Button type="button" variant="ghost" size="sm" onClick={handleChangePosition}>
+                  {describeContractPosition(position) ? 'تغيير' : 'حدّد صفتك'}
+                </Button>
+              </div>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label htmlFor="contract-file" className="mb-2 block text-body-sm text-text-secondary">
@@ -238,6 +312,8 @@ export function ContractsScreen() {
               ) : null}
             </div>
           </form>
+            </>
+          )}
 
           <div className="mt-6 space-y-4" aria-live="polite">
             {status === 'loading' ? (
@@ -280,6 +356,12 @@ export function ContractsScreen() {
                       <p className="mt-1 text-body-sm text-text-secondary">
                         {result.clause_count ?? 0} بند تم استخراجه وتقييمه.
                       </p>
+                      {result.client_role ? (
+                        <p className="mt-1 text-body-sm text-text-secondary">
+                          منظور التدقيق: {result.client_role}
+                          {result.contract_type ? ` — ${result.contract_type}` : ''}
+                        </p>
+                      ) : null}
                     </div>
 
                     {/* تنزيل التقرير (الهجرة 203): التقرير الآلى مسودة عمل حتى يعتمده

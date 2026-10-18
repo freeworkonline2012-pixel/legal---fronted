@@ -45,6 +45,7 @@ async function upload(response: ContractResponse) {
   mockedUpload.mockResolvedValue(response);
   const user = userEvent.setup();
   render(<ContractsScreen />);
+  await user.click(await screen.findByRole('button', { name: 'تخطَّ وأجبنى مباشرة' }));
   const file = new File(['x'], 'c.docx', {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   });

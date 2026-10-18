@@ -80,6 +80,10 @@ function makeFile(name: string, sizeBytes = 1024, type = 'application/vnd.openxm
   return file;
 }
 
+async function skipPositionStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'تخطَّ وأجبنى مباشرة' }));
+}
+
 describe('ContractsScreen', () => {
   beforeEach(() => {
     mockedUpload.mockReset();
@@ -95,7 +99,9 @@ describe('ContractsScreen', () => {
 
   it('يعرض نموذج الرفع والتنبيه الدائم عند وجود جلسة', async () => {
     setAuthSession(SESSION);
+    const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
     expect(await screen.findByLabelText('ملف العقد')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/تقييم أولى آلى.*ليس رأياً قانونياً/);
   });
@@ -107,6 +113,7 @@ describe('ContractsScreen', () => {
     // فعلاً ويجعل هذا التحقق البرمجى ذا قيمة حقيقية لا زائدة عن الحاجة.
     const user = userEvent.setup({ applyAccept: false });
     render(<ContractsScreen />);
+    await skipPositionStep(user);
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('contract.txt', 1024, 'text/plain'));
 
@@ -118,6 +125,7 @@ describe('ContractsScreen', () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('big.docx', 11 * 1024 * 1024));
 
@@ -130,6 +138,7 @@ describe('ContractsScreen', () => {
     mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
     const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
@@ -149,6 +158,7 @@ describe('ContractsScreen', () => {
     mockedUpload.mockResolvedValue(EXTRACTION_FAILED_RESPONSE);
     const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('scanned.pdf', 1024, 'application/pdf'));
@@ -165,6 +175,7 @@ describe('ContractsScreen', () => {
     mockedUpload.mockRejectedValueOnce(new ApiError(401, 'unauthorized'));
     const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
@@ -178,6 +189,7 @@ describe('ContractsScreen', () => {
     mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
     const user = userEvent.setup();
     render(<ContractsScreen />);
+    await skipPositionStep(user);
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
@@ -191,4 +203,46 @@ describe('ContractsScreen', () => {
 
     expect(screen.queryByText('test-contract.docx')).not.toBeInTheDocument();
   }, 15000);
+
+  it('قبل الرفع: يعرض أسئلة النوع ثم الصفة، ولا يظهر نموذج الرفع قبل إتمامهما', async () => {
+    setAuthSession(SESSION);
+    render(<ContractsScreen />);
+    expect(await screen.findByText(/ما نوع العقد الذى تريد تدقيقه/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('ملف العقد')).not.toBeInTheDocument();
+  });
+
+  it('يمرّر النوع والصفة المختارين إلى الرفع ويعرضهما فى الشريط', async () => {
+    setAuthSession(SESSION);
+    mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
+    const user = userEvent.setup();
+    render(<ContractsScreen />);
+
+    await user.selectOptions(await screen.findByLabelText(/ما نوع العقد/), 'عقد إيجار');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+    // الجولة الثانية: خيارات الصفة تتبع النوع
+    await user.selectOptions(await screen.findByLabelText(/ما صفتك فى هذا العقد/), 'المستأجر');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+
+    expect(await screen.findByTestId('position-banner')).toHaveTextContent('المستأجر — عقد إيجار');
+    await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
+
+    await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
+    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: 'عقد إيجار', client_role: 'المستأجر' });
+  });
+
+  it('التخطّى = تدقيق محايد (بلا نوع ولا صفة) مع إمكان تحديد الصفة لاحقاً', async () => {
+    setAuthSession(SESSION);
+    mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
+    const user = userEvent.setup();
+    render(<ContractsScreen />);
+    await skipPositionStep(user);
+    expect(await screen.findByTestId('position-banner')).toHaveTextContent('تدقيق محايد');
+    await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
+    await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
+    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: null, client_role: null });
+    await user.click(screen.getByRole('button', { name: 'حدّد صفتك' }));
+    expect(await screen.findByText(/ما نوع العقد الذى تريد تدقيقه/)).toBeInTheDocument();
+  });
 });

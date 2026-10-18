@@ -717,6 +717,9 @@ export interface ContractResponse {
   status: ContractStatus;
   extraction_error: string | null;
   clause_count: number | null;
+  /** نوع العقد ومركز العميل من الاستيضاح قبل الرفع (null = تدقيق محايد) */
+  contract_type?: string | null;
+  client_role?: string | null;
   /** تحذيرات غير حاجبة من مرحلة التقسيم (مثال: ترقيم بنود غير متسلسل) */
   warnings?: string[];
   clauses?: ContractClauseItem[];
