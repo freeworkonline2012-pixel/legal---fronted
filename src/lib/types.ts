@@ -705,6 +705,9 @@ export interface SuggestedRedraft {
   text: string;
   changes: string[];
   disclaimer: string;
+  /** البند جائز كما هو: لا صياغة بديلة، والسبب فى note */
+  no_change?: boolean;
+  note?: string | null;
 }
 
 /** رد POST /api/contracts وGET /api/contracts/{id} — يطابق ContractResponseDto */

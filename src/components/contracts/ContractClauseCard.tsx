@@ -102,9 +102,15 @@ export function ContractClauseCard({ clause, defaultTextExpanded = false, contra
             <div role="region" aria-label="صياغة مقترحة للبند" className="rounded-md bg-primary-soft p-4">
               <h5 className="flex items-center gap-1.5 text-body-sm font-semibold text-text-primary">
                 <PenLine className="h-4 w-4" aria-hidden="true" />
-                صياغة مقترحة
+                {redraft.no_change ? 'لا يتطلب البند تعديلاً' : 'صياغة مقترحة'}
               </h5>
-              <p className="legal-text mt-2 whitespace-pre-line text-text-primary">{redraft.text}</p>
+              {redraft.no_change ? (
+                <p className="mt-2 text-body-sm text-text-primary">
+                  {redraft.note ?? 'لا يتطلب البند تعديلاً لإزالة خطر قانونى محدد.'}
+                </p>
+              ) : (
+                <p className="legal-text mt-2 whitespace-pre-line text-text-primary">{redraft.text}</p>
+              )}
               {redraft.changes.length > 0 ? (
                 <ul className="mt-3 list-disc space-y-1 pe-5 text-body-sm text-text-secondary">
                   {redraft.changes.map((change, i) => (

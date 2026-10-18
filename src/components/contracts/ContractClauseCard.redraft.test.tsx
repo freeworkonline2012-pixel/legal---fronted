@@ -75,6 +75,23 @@ describe('ContractClauseCard — معايير المراجعة والصياغة 
     expect(screen.queryByRole('button', { name: 'اقترح صياغة بديلة' })).not.toBeInTheDocument();
   });
 
+  it('يعرض "لا يتطلب تعديلاً" مع السبب بدل نص بديل', async () => {
+    mockedPropose.mockResolvedValue({
+      ...CLAUSE,
+      suggested_redraft: {
+        text: '',
+        changes: [],
+        disclaimer: 'تنويه',
+        no_change: true,
+        note: 'الاتفاق على خلاف قاعدة مكملة جائز.',
+      },
+    });
+    render(<ContractClauseCard clause={CLAUSE} contractId="c1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'اقترح صياغة بديلة' }));
+    expect(await screen.findByText('لا يتطلب البند تعديلاً')).toBeInTheDocument();
+    expect(screen.getByText('الاتفاق على خلاف قاعدة مكملة جائز.')).toBeInTheDocument();
+  });
+
   it('يعرض صياغة مخزَّنة سابقاً دون زر', () => {
     render(
       <ContractClauseCard
