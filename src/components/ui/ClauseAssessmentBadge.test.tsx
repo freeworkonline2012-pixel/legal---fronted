@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react';
 import { ClauseAssessmentBadge } from './ClauseAssessmentBadge';
 
 describe('ClauseAssessmentBadge', () => {
-  it('يعرض شارة "سليم" بنص وأيقونة معلنة عبر role=status', () => {
+  it('يعرض حالة "سليم" بصياغة "لا مخالفة ظاهرة" حتى لا توحى باعتماد نهائى', () => {
     render(<ClauseAssessmentBadge status="سليم" />);
-    expect(screen.getByRole('status', { name: 'تقييم البند: سليم' })).toHaveTextContent('سليم');
+    expect(screen.getByRole('status', { name: 'تقييم البند: لا مخالفة ظاهرة' })).toHaveTextContent('لا مخالفة ظاهرة');
   });
 
   it('يعرض شارة "يحتاج مراجعة"', () => {

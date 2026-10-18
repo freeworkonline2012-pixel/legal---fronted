@@ -7,7 +7,7 @@ import { ContractsScreen } from '@/components/contracts/ContractsScreen';
 export const metadata: Metadata = {
   title: 'المدقق القانونى للعقود — منصة قانونية عربية',
   description:
-    'ارفع عقداً (PDF أو DOCX) لاستخراج بنوده وتقييمها الأولى مقابل النصوص القانونية المصرية المفهرَسة — ميزة جديدة (Phase 1+2 الأساسية).',
+    'ارفع عقداً (PDF أو DOCX) لاستخراج بنوده وتقييمها الأولى مقابل النصوص القانونية المصرية المفهرَسة — تقييم أولى آلى قيد التطوير.',
 };
 
 export default function ContractsPage() {

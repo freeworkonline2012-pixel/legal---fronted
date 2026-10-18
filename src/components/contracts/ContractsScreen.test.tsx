@@ -97,7 +97,7 @@ describe('ContractsScreen', () => {
     setAuthSession(SESSION);
     render(<ContractsScreen />);
     expect(await screen.findByLabelText('ملف العقد')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/القانون المدنى المصرى.*غير مفهرَس بعد/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/تقييم أولى آلى.*ليس رأياً قانونياً/);
   });
 
   it('يرفض ملفاً بامتداد غير مدعوم قبل استدعاء الخادم', async () => {

@@ -29,7 +29,8 @@ const STATUS_COLOR_CLASSES: Record<ClauseAssessmentStatus, string> = {
 
 /** نص مختصر للشارة نفسها — الحالة الثالثة طويلة جداً لتُعرض كاملة داخل شارة صغيرة */
 const STATUS_SHORT_LABEL: Record<ClauseAssessmentStatus, string> = {
-  'سليم': 'سليم',
+  // "سليم" يوحى باعتماد نهائى؛ الحالة تعنى فقط عدم ظهور مخالفة للنصوص المعتمَدة (2026-10-18)
+  'سليم': 'لا مخالفة ظاهرة',
   'يحتاج مراجعة': 'يحتاج مراجعة',
   'لا يوجد نص قانونى مصرى مفهرَس ذو صلة مباشرة': 'لا يوجد نص مفهرَس',
 };
@@ -44,7 +45,7 @@ export function ClauseAssessmentBadge({ status }: ClauseAssessmentBadgeProps) {
   return (
     <span
       role="status"
-      aria-label={`تقييم البند: ${status}`}
+      aria-label={`تقييم البند: ${status === 'سليم' ? STATUS_SHORT_LABEL[status] : status}`}
       className={`inline-flex h-8 w-fit shrink-0 items-center gap-1.5 rounded-full border px-3 text-body-sm font-semibold ${STATUS_COLOR_CLASSES[status]}`}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />

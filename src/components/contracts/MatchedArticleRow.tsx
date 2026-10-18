@@ -20,13 +20,17 @@ export function MatchedArticleRow({ article }: MatchedArticleRowProps) {
   const [expanded, setExpanded] = useState(false);
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const textId = `matched-article-text-${instanceId}`;
+  // عنوان القانون المخزَّن قد يتضمن الرقم والسنة أصلاً ("القانون المدنى 131/1948")
+  // فلا نكرره (عطل ظهر فى 2026-10-18: "131/1948 131/1948").
+  const numberSuffix = `${article.law_no}/${article.law_year}`;
+  const lawLabel = article.law.includes(numberSuffix) ? article.law : `${article.law} ${numberSuffix}`;
 
   return (
     <div className="rounded-md border border-border-default bg-surface-muted p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Scale className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
         <span className="text-body-sm font-semibold text-text-primary">
-          {article.law} {article.law_no}/{article.law_year} — المادة {article.article_no}
+          {lawLabel} — المادة {article.article_no}
         </span>
       </div>
 
