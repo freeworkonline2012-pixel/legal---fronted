@@ -697,6 +697,14 @@ export interface ContractClauseItem {
   assessment_reasoning: string | null;
   matched_articles: MatchedArticle[] | null;
   assessment_confidence: number | null;
+  /** صياغة بديلة مقترحة (تُولَّد عند الطلب وبعد فحوص أمان آلية؛ للاسترشاد وتُراجَع من محامٍ) */
+  suggested_redraft?: SuggestedRedraft | null;
+}
+
+export interface SuggestedRedraft {
+  text: string;
+  changes: string[];
+  disclaimer: string;
 }
 
 /** رد POST /api/contracts وGET /api/contracts/{id} — يطابق ContractResponseDto */

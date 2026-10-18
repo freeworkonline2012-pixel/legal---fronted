@@ -326,7 +326,7 @@ export function ContractsScreen() {
                     ) : null}
 
                     {result.clauses && result.clauses.length > 0 ? (
-                      result.clauses.map((clause) => <ContractClauseCard key={clause.id} clause={clause} />)
+                      result.clauses.map((clause) => <ContractClauseCard key={clause.id} clause={clause} contractId={result.id} />)
                     ) : (
                       <p className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-tertiary">
                         لم يُستخرَج أى بند من هذا العقد.

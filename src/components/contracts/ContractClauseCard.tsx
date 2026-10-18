@@ -11,18 +11,46 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { ChevronDown, ChevronUp, MessageSquareWarning } from 'lucide-react';
-import type { ContractClauseItem } from '@/lib/types';
+import { ChevronDown, ChevronUp, MessageSquareWarning, PenLine } from 'lucide-react';
+import type { ContractClauseItem, SuggestedRedraft } from '@/lib/types';
+import { ApiError, proposeClauseRedraft } from '@/lib/api-client';
+import { criteriaLabels } from '@/lib/contract-criteria';
+import { Button } from '@/components/ui/Button';
 import { ClauseAssessmentBadge } from '@/components/ui/ClauseAssessmentBadge';
 import { MatchedArticleRow } from './MatchedArticleRow';
 
 export interface ContractClauseCardProps {
   clause: ContractClauseItem;
   defaultTextExpanded?: boolean;
+  /** معرّف العقد — لازم لزر الصياغة المقترحة (يُخفى الزر إن غاب) */
+  contractId?: string;
 }
 
-export function ContractClauseCard({ clause, defaultTextExpanded = false }: ContractClauseCardProps) {
+export function ContractClauseCard({ clause, defaultTextExpanded = false, contractId }: ContractClauseCardProps) {
   const [textExpanded, setTextExpanded] = useState(defaultTextExpanded);
+  const [redraft, setRedraft] = useState<SuggestedRedraft | null>(clause.suggested_redraft ?? null);
+  const [redraftLoading, setRedraftLoading] = useState(false);
+  const [redraftError, setRedraftError] = useState<string | null>(null);
+  const labels = criteriaLabels(clause.clause_type_guess);
+  const canRedraft =
+    Boolean(contractId) &&
+    clause.assessment_status === 'يحتاج مراجعة' &&
+    (clause.matched_articles?.length ?? 0) > 0;
+
+  async function handleRedraft() {
+    if (!contractId) return;
+    setRedraftLoading(true);
+    setRedraftError(null);
+    try {
+      const updated = await proposeClauseRedraft(contractId, clause.id);
+      setRedraft(updated.suggested_redraft ?? null);
+      if (!updated.suggested_redraft) setRedraftError('لم تُرجِع الخدمة صياغة مقترحة لهذا البند.');
+    } catch (err) {
+      setRedraftError(err instanceof ApiError ? err.message : 'تعذّر توليد الصياغة المقترحة الآن.');
+    } finally {
+      setRedraftLoading(false);
+    }
+  }
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const clauseTextId = `clause-text-${instanceId}`;
 
@@ -36,6 +64,18 @@ export function ContractClauseCard({ clause, defaultTextExpanded = false }: Cont
           <h4 className="text-h4 font-semibold text-text-primary">{clause.clause_label}</h4>
           {clause.clause_title ? (
             <p className="mt-0.5 text-body-sm text-text-secondary">{clause.clause_title}</p>
+          ) : null}
+          {labels.length > 0 ? (
+            <ul aria-label="معايير المراجعة المرتبطة بالبند" className="mt-2 flex flex-wrap gap-1.5">
+              {labels.map((label) => (
+                <li
+                  key={label}
+                  className="rounded-full bg-surface-muted px-2.5 py-0.5 text-caption text-text-secondary"
+                >
+                  {label}
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
         {clause.assessment_status ? <ClauseAssessmentBadge status={clause.assessment_status} /> : null}
@@ -53,6 +93,37 @@ export function ContractClauseCard({ clause, defaultTextExpanded = false }: Cont
           {clause.matched_articles.map((article, index) => (
             <MatchedArticleRow key={`${article.law_no}-${article.law_year}-${article.article_no}-${index}`} article={article} />
           ))}
+        </div>
+      ) : null}
+
+      {canRedraft ? (
+        <div className="mt-3 border-t border-border-default pt-3">
+          {redraft ? (
+            <div role="region" aria-label="صياغة مقترحة للبند" className="rounded-md bg-primary-soft p-4">
+              <h5 className="flex items-center gap-1.5 text-body-sm font-semibold text-text-primary">
+                <PenLine className="h-4 w-4" aria-hidden="true" />
+                صياغة مقترحة
+              </h5>
+              <p className="legal-text mt-2 whitespace-pre-line text-text-primary">{redraft.text}</p>
+              {redraft.changes.length > 0 ? (
+                <ul className="mt-3 list-disc space-y-1 pe-5 text-body-sm text-text-secondary">
+                  {redraft.changes.map((change, i) => (
+                    <li key={i}>{change}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="mt-3 text-caption text-text-tertiary">{redraft.disclaimer}</p>
+            </div>
+          ) : (
+            <Button variant="secondary" size="sm" loading={redraftLoading} onClick={handleRedraft}>
+              اقترح صياغة بديلة
+            </Button>
+          )}
+          {redraftError ? (
+            <p role="alert" className="mt-2 text-body-sm text-error">
+              {redraftError}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

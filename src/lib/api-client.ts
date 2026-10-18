@@ -11,6 +11,7 @@ import type {
   ArticleListResponse,
   AnalyzeDocumentResponse,
   AuthResponse,
+  ContractClauseItem,
   ContractResponse,
   CreateMemoRequest,
   CreateMemoResponse,
@@ -422,6 +423,39 @@ export async function uploadContract(file: File): Promise<ContractResponse> {
   }
 
   return (await res.json()) as ContractResponse;
+}
+
+/**
+ * POST /api/contracts/{id}/clauses/{clauseId}/redraft — صياغة بديلة مقترحة لبند يحتاج
+ * مراجعة وله سند معتمَد. 400/422 تحمل رسالة عربية دقيقة من الخلفية (مثل: لم تجتز فحوص
+ * الأمان) فتُقرأ وتُعرَض كما هى، لا رسالة عامة.
+ */
+export async function proposeClauseRedraft(contractId: string, clauseId: string): Promise<ContractClauseItem> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_BASE_URL}/contracts/${encodeURIComponent(contractId)}/clauses/${encodeURIComponent(clauseId)}/redraft`,
+      { method: 'POST', headers, cache: 'no-store' },
+    );
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: string };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON
+    }
+    throw new ApiError(res.status, detail ?? `تعذّر توليد الصياغة المقترحة (HTTP ${res.status})`);
+  }
+  return (await res.json()) as ContractClauseItem;
 }
 
 /** GET /api/contracts/{id} — حالة عقد وبنوده وتقييمها (401 بلا جلسة، 403 لغير المالك، 404 لعقد غير موجود) */
