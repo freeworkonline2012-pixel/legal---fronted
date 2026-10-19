@@ -7,10 +7,9 @@
  * مخاطر، صياغة بديلة، مراجعة محامٍ) وPhase 4 (تقرير PDF) مؤجَّلتان عمداً بطلب
  * صريح من رجل الأعمال — لا تُبنَ فى هذه الشاشة.
  *
- * تحديث 2026-10-18: القانون المدنى 131/1948 صار مفهرَساً بالكامل (1 أكتوبر 2026)،
- * فأُزيل من التنبيه الدائم ادعاء "غير مفهرَس" القديم (كان يناقض نتائج الشاشة نفسها).
- * التنبيه الدائم أدناه يذكر حدود التقييم الآلى بصدق (غير قابل للطى، بنفس مبدأ
- * تنبيه GovernanceScreen) — لا تُزله ولا تُلطّفه.
+ * تحديث 2026-10-19: بطلب صريح من رجل الأعمال أُزيلت من أعلى الصفحة جملة التعريف
+ * ("ارفع عقداً... نستخرج بنوده...") والتنبيه الدائم "تقييم أولى آلى — قيد التطوير".
+ * القرار قراره؛ لا تُعد أيا منهما دون طلب منه.
  *
  * ⚠️ مصادقة إلزامية (بخلاف GovernanceScreen): نقطة النهاية POST /api/contracts
  * تتطلب JwtAuthGuard إلزامياً فى backend (بيانات عقود عمل حقيقية للمستخدم) —
@@ -21,7 +20,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, FileWarning, FlaskConical, LogIn, RefreshCw, ScrollText, UploadCloud, UserCheck, WifiOff } from 'lucide-react';
+import { AlertTriangle, FileWarning, LogIn, RefreshCw, ScrollText, UploadCloud, UserCheck, WifiOff } from 'lucide-react';
 import type { ClarificationAnswerPayload, ContractResponse } from '@/lib/types';
 import {
   NEUTRAL_POSITION,
@@ -198,28 +197,6 @@ export function ContractsScreen() {
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <ScrollText className="h-10 w-10 text-primary" aria-hidden="true" />
         <h1 className="text-h2 font-bold text-text-primary">المدقق القانونى للعقود</h1>
-        <p className="max-w-lg text-body text-text-secondary">
-          ارفع عقداً (PDF أو DOCX) — نستخرج بنوده ونبحث لكل بند عن مواد قانونية مصرية مفهرَسة ذات
-          صلة، ونعرض تقييماً أولياً لكل بند.
-        </p>
-      </div>
-
-      {/* تنبيه دائم غير قابل للطى — نفس مبدأ GovernanceScreen. راجع تعليق أعلى
-          الملف قبل إزالته أو تلطيفه. */}
-      <div
-        role="alert"
-        className="mb-6 flex items-start gap-3 rounded-lg border border-warning bg-warning-soft px-4 py-3"
-      >
-        <FlaskConical className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-        <div>
-          <p className="text-body-sm font-semibold text-text-primary">تقييم أولى آلى — قيد التطوير</p>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            نقارن كل بند بالنصوص المصرية المفهرَسة لدينا (ومنها القانون المدنى 131/1948). قد يغفل
-            التقييم نصاً ذا صلة أو يُخطئ فى نطاق سريان قانون على عقدك، وما لا نجد له نصاً مفهرَساً
-            يُعرَض بصدق كـ&quot;لا يوجد نص مفهرَس&quot; بدل استشهاد مُخترَع. هذا ليس رأياً قانونياً
-            ولا يُغنى عن مراجعة محامٍ مختص قبل أى قرار فعلى.
-          </p>
-        </div>
       </div>
 
       {authed === false ? (

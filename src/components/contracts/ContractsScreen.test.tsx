@@ -97,13 +97,14 @@ describe('ContractsScreen', () => {
     expect(screen.queryByLabelText('ملف العقد')).not.toBeInTheDocument();
   });
 
-  it('يعرض نموذج الرفع والتنبيه الدائم عند وجود جلسة', async () => {
+  it('يعرض نموذج الرفع دون جملة التعريف أو التنبيه الأعلى عند وجود جلسة', async () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
     render(<ContractsScreen />);
     await skipPositionStep(user);
     expect(await screen.findByLabelText('ملف العقد')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/تقييم أولى آلى.*ليس رأياً قانونياً/);
+    expect(screen.queryByText(/تقييم أولى آلى/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/نستخرج بنوده/)).not.toBeInTheDocument();
   });
 
   it('يرفض ملفاً بامتداد غير مدعوم قبل استدعاء الخادم', async () => {
