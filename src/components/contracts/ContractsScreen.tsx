@@ -34,6 +34,7 @@ import {
 } from '@/lib/contract-position';
 import { ApiError, approveContractReport, uploadContract } from '@/lib/api-client';
 import { getCurrentUser, isAuthenticated } from '@/lib/auth';
+import { isGuestUser } from '@/lib/guest';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { ExportButtons } from '@/components/ui/ExportButtons';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
@@ -132,7 +133,9 @@ export function ContractsScreen() {
           ? err.status === 0
             ? 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.'
             : err.status === 401
-              ? 'انتهت صلاحية جلستك — سجّل الدخول مرة أخرى ثم أعد المحاولة.'
+              ? isGuestUser(getCurrentUser())
+                ? 'انتهت جلسة الزائر — حدّث الصفحة لتبدأ جلسة جديدة تلقائياً ثم أعد المحاولة.'
+                : 'انتهت صلاحية جلستك — سجّل الدخول مرة أخرى ثم أعد المحاولة.'
               : err.message || `فشل رفع العقد (HTTP ${err.status}) — حاول مرة أخرى.`
           : 'حدث خطأ غير متوقّع — حاول مرة أخرى.';
       setErrorMessage(message);

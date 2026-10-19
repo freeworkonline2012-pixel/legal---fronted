@@ -57,6 +57,25 @@ export function isAuthenticated(): boolean {
   return getAccessToken() !== null;
 }
 
+/**
+ * هل انتهت صلاحية توكن الوصول المخزَّن؟ يقرأ حقل exp من حمولة JWT (بلا تحقق من التوقيع: هذا فحص
+ * راحة للواجهة فقط، والخادم هو الحكم). توكن غير مقروء = لا يُعدّ منتهياً (تبقى الحماية على الخادم).
+ */
+export function isAccessTokenExpired(skewSeconds = 60): boolean {
+  const token = getAccessToken();
+  if (!token) return false;
+  try {
+    const part = token.split('.')[1];
+    if (!part) return false;
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    if (typeof exp !== 'number') return false;
+    return exp * 1000 <= Date.now() + skewSeconds * 1000;
+  } catch {
+    return false;
+  }
+}
+
 /** حفظ الجلسة بعد register/login */
 export function setAuthSession(session: AuthResponse): void {
   if (!hasWindow()) return;

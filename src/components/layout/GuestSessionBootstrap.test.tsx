@@ -154,4 +154,43 @@ describe('GuestSessionBootstrap', () => {
     expect(mockedConfig).not.toHaveBeenCalled();
     expect(container).toBeEmptyDOMElement();
   });
+
+  function jwtWithExp(expSeconds: number): string {
+    const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+    return `${b64({ alg: 'HS256' })}.${b64({ exp: expSeconds })}.sig`;
+  }
+
+  it('جلسة زائر منتهية: تُمسح ويبدأ زائر جديد تلقائياً (موافقة سابقة)', async () => {
+    setAuthSession({ ...GUEST_SESSION, access_token: jwtWithExp(Math.floor(Date.now() / 1000) - 3600) });
+    storeGuestConsent('v1');
+    mockedConfig.mockResolvedValue({ enabled: true, consent_version: 'v1' });
+    mockedCreate.mockResolvedValue({ ...GUEST_SESSION, access_token: jwtWithExp(Math.floor(Date.now() / 1000) + 86400) });
+    render(<GuestSessionBootstrap />);
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(reloadMock).toHaveBeenCalled());
+  });
+
+  it('جلسة زائر سارية: لا استدعاء ولا مسح', async () => {
+    const token = jwtWithExp(Math.floor(Date.now() / 1000) + 86400);
+    setAuthSession({ ...GUEST_SESSION, access_token: token });
+    mockedConfig.mockResolvedValue({ enabled: true, consent_version: 'v1' });
+    render(<GuestSessionBootstrap />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockedConfig).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe(token);
+  });
+
+  it('جلسة مستخدم عادى منتهية لا تُمسح ولا يُنشأ زائر (يبقى تسجيل الدخول)', async () => {
+    const token = jwtWithExp(Math.floor(Date.now() / 1000) - 3600);
+    setAuthSession({
+      access_token: token,
+      refresh_token: 'r',
+      user: { ...GUEST_SESSION.user, email: 'me@example.com' },
+    });
+    mockedConfig.mockResolvedValue({ enabled: true, consent_version: 'v1' });
+    render(<GuestSessionBootstrap />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockedCreate).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe(token);
+  });
 });

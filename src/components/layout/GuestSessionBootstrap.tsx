@@ -25,8 +25,8 @@ import Link from 'next/link';
 import { FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { createGuestSession, fetchGuestConfig } from '@/lib/api-client';
-import { isAuthenticated, setAuthSession } from '@/lib/auth';
-import { hasStoredGuestConsent, storeGuestConsent } from '@/lib/guest';
+import { clearAuthSession, getCurrentUser, isAccessTokenExpired, isAuthenticated, setAuthSession } from '@/lib/auth';
+import { hasStoredGuestConsent, isGuestUser, storeGuestConsent } from '@/lib/guest';
 
 type Phase = 'idle' | 'prompt' | 'starting' | 'error';
 
@@ -60,7 +60,15 @@ export function GuestSessionBootstrap() {
   }
 
   useEffect(() => {
-    if (isAuthenticated()) return;
+    if (isAuthenticated()) {
+      // جلسة زائر منتهية الصلاحية (تبويب بقى مفتوحاً أو جلسة قديمة): تُمسح ويبدأ زائر جديد تلقائياً
+      // بدل رسالة "سجّل الدخول". حساب المستخدم العادى لا يُمسّ أبداً.
+      if (isGuestUser(getCurrentUser()) && isAccessTokenExpired()) {
+        clearAuthSession();
+      } else {
+        return;
+      }
+    }
     if (HIDDEN_PATH_PREFIXES.some((p) => window.location.pathname.startsWith(p))) return;
 
     let cancelled = false;
