@@ -720,6 +720,7 @@ export interface ContractResponse {
   /** نوع العقد ومركز العميل من الاستيضاح قبل الرفع (null = تدقيق محايد) */
   contract_type?: string | null;
   client_role?: string | null;
+  client_party?: 'first' | 'second' | null;
   /** تحذيرات غير حاجبة من مرحلة التقسيم (مثال: ترقيم بنود غير متسلسل) */
   warnings?: string[];
   clauses?: ContractClauseItem[];

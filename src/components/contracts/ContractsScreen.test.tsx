@@ -223,13 +223,34 @@ describe('ContractsScreen', () => {
     // الجولة الثانية: خيارات الصفة تتبع النوع
     await user.selectOptions(await screen.findByLabelText(/ما صفتك فى هذا العقد/), 'المستأجر');
     await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+    // الجولة الثالثة: أى الطرفين فى نص العقد هو أنت
+    await user.selectOptions(await screen.findByLabelText(/هل أنت «الطرف الأول» أم «الطرف الثانى»/), 'الطرف الثانى');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
 
-    expect(await screen.findByTestId('position-banner')).toHaveTextContent('المستأجر — عقد إيجار');
+    expect(await screen.findByTestId('position-banner')).toHaveTextContent('المستأجر — عقد إيجار (الطرف الثانى فى نص العقد)');
     await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
-    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: 'عقد إيجار', client_role: 'المستأجر' });
+    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: 'عقد إيجار', client_role: 'المستأجر', client_party: 'second' });
+  });
+
+  it('«لا أعرف» فى سؤال الطرف: يُحفظ المركز بلا طرف مع تنبيه أن الصياغة المقترحة لن تتوفر', async () => {
+    setAuthSession(SESSION);
+    mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
+    const user = userEvent.setup();
+    render(<ContractsScreen />);
+    await user.selectOptions(await screen.findByLabelText(/ما نوع العقد/), 'عقد إيجار');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+    await user.selectOptions(await screen.findByLabelText(/ما صفتك فى هذا العقد/), 'المستأجر');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+    await user.selectOptions(await screen.findByLabelText(/هل أنت «الطرف الأول» أم «الطرف الثانى»/), 'لا أعرف');
+    await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
+    expect(await screen.findByTestId('party-missing')).toHaveTextContent('لن تتوفر الصياغة المقترحة');
+    await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
+    await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
+    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: 'عقد إيجار', client_role: 'المستأجر', client_party: null });
   });
 
   it('التخطّى = تدقيق محايد (بلا نوع ولا صفة) مع إمكان تحديد الصفة لاحقاً', async () => {
@@ -242,7 +263,7 @@ describe('ContractsScreen', () => {
     await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
     await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
-    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: null, client_role: null });
+    expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: null, client_role: null, client_party: null });
     await user.click(screen.getByRole('button', { name: 'حدّد صفتك' }));
     expect(await screen.findByText(/ما نوع العقد الذى تريد تدقيقه/)).toBeInTheDocument();
   });

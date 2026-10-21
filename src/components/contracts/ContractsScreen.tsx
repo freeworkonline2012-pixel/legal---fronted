@@ -25,6 +25,7 @@ import type { ClarificationAnswerPayload, ContractResponse } from '@/lib/types';
 import {
   NEUTRAL_POSITION,
   answerText,
+  clientPartyQuestion,
   clientRoleQuestion,
   contractTypeQuestion,
   describeContractPosition,
@@ -82,8 +83,9 @@ export function ContractsScreen() {
 
   // الاستيضاح قبل الرفع: نوع العقد ثم صفة المستخدم فيه (نفس بطاقة استيضاح الأسئلة العامة).
   // 'done' = حُدِّد المركز أو تُخطّى (تدقيق محايد) فيظهر نموذج الرفع.
-  const [positionPhase, setPositionPhase] = useState<'type' | 'role' | 'done'>('type');
+  const [positionPhase, setPositionPhase] = useState<'type' | 'role' | 'party' | 'done'>('type');
   const [typeAnswer, setTypeAnswer] = useState<ClarificationAnswerPayload | null>(null);
+  const [roleAnswer, setRoleAnswer] = useState<ClarificationAnswerPayload | null>(null);
   const [position, setPosition] = useState<ContractPosition>(NEUTRAL_POSITION);
 
   useEffect(() => {
@@ -165,18 +167,32 @@ export function ContractsScreen() {
   }
 
   function handleRoleSubmit(answers: ClarificationAnswerPayload[]) {
-    setPosition(positionFromAnswers(typeAnswer, answers[0] ?? null));
+    const role = answers[0] ?? null;
+    if (answerText(role) === null) {
+      // «لا أعرف» فى الصفة = تدقيق محايد، فلا معنى لسؤال الطرف
+      setPosition(positionFromAnswers(typeAnswer, role));
+      setPositionPhase('done');
+      return;
+    }
+    setRoleAnswer(role);
+    setPositionPhase('party');
+  }
+
+  function handlePartySubmit(answers: ClarificationAnswerPayload[]) {
+    setPosition(positionFromAnswers(typeAnswer, roleAnswer, answers[0] ?? null));
     setPositionPhase('done');
   }
 
   function handlePositionSkip() {
     setTypeAnswer(null);
+    setRoleAnswer(null);
     setPosition(NEUTRAL_POSITION);
     setPositionPhase('done');
   }
 
   function handleChangePosition() {
     setTypeAnswer(null);
+    setRoleAnswer(null);
     setPositionPhase('type');
   }
 
@@ -220,15 +236,22 @@ export function ContractsScreen() {
               {positionPhase === 'type' ? (
                 <ClarificationCard
                   key="position-type"
-                  request={{ round: 1, max_rounds: 2, questions: [contractTypeQuestion()] }}
+                  request={{ round: 1, max_rounds: 3, questions: [contractTypeQuestion()] }}
                   onSubmit={handleTypeSubmit}
+                  onSkip={handlePositionSkip}
+                />
+              ) : positionPhase === 'role' ? (
+                <ClarificationCard
+                  key="position-role"
+                  request={{ round: 2, max_rounds: 3, questions: [clientRoleQuestion(answerText(typeAnswer))] }}
+                  onSubmit={handleRoleSubmit}
                   onSkip={handlePositionSkip}
                 />
               ) : (
                 <ClarificationCard
-                  key="position-role"
-                  request={{ round: 2, max_rounds: 2, questions: [clientRoleQuestion(answerText(typeAnswer))] }}
-                  onSubmit={handleRoleSubmit}
+                  key="position-party"
+                  request={{ round: 3, max_rounds: 3, questions: [clientPartyQuestion()] }}
+                  onSubmit={handlePartySubmit}
                   onSkip={handlePositionSkip}
                 />
               )}
@@ -245,6 +268,11 @@ export function ContractsScreen() {
                     ? `نُدقّق العقد من منظور: ${describeContractPosition(position)}`
                     : 'تدقيق محايد — لم تحدّد صفتك فى العقد.'}
                 </p>
+                {position.client_role && !position.client_party ? (
+                  <p data-testid="party-missing" className="w-full text-caption text-text-secondary">
+                    لم تحدّد هل أنت «الطرف الأول» أم «الطرف الثانى»: لن تتوفر الصياغة المقترحة حتى تحدده (اضغط «تغيير»).
+                  </p>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" onClick={handleChangePosition}>
                   {describeContractPosition(position) ? 'تغيير' : 'حدّد صفتك'}
                 </Button>
@@ -340,6 +368,8 @@ export function ContractsScreen() {
                         <p className="mt-1 text-body-sm text-text-secondary">
                           منظور التدقيق: {result.client_role}
                           {result.contract_type ? ` — ${result.contract_type}` : ''}
+                          {result.client_party === 'first' ? ' (الطرف الأول فى نص العقد)' : ''}
+                          {result.client_party === 'second' ? ' (الطرف الثانى فى نص العقد)' : ''}
                         </p>
                       ) : null}
                     </div>

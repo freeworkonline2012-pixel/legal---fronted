@@ -394,6 +394,7 @@ export async function uploadContract(file: File, position?: ContractPosition | n
   // حقول مركز العميل تسبق الملف (اختيارية): الخادم ينقّيها، وغيابها = تدقيق محايد
   if (position?.contract_type) formData.append('contract_type', position.contract_type);
   if (position?.client_role) formData.append('client_role', position.client_role);
+  if (position?.client_role && position.client_party) formData.append('client_party', position.client_party);
   formData.append('file', file);
 
   const headers: Record<string, string> = {};
