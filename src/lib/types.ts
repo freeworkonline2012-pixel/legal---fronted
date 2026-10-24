@@ -710,6 +710,26 @@ export interface SuggestedRedraft {
   note?: string | null;
 }
 
+/** دليل نصى لملاحظة على العقد ككل: اقتباس حرفى من البند المذكور — يطابق FindingEvidenceDto */
+export interface ContractFindingEvidence {
+  clause_index: number;
+  clause_label: string;
+  quote: string;
+}
+
+/** ملاحظة على العقد ككل (بند غير مرصود، إحالة غير معرّفة، شرط مفتوح، تعارض محتمل) — يطابق ContractFindingDto */
+export interface ContractFinding {
+  id: string;
+  kind: 'missing_clause' | 'undefined_term' | 'open_term' | 'conflict' | 'scope_mismatch';
+  kind_label: string;
+  severity: 'حرج' | 'عالٍ' | 'متوسط' | 'منخفض';
+  title: string;
+  explanation: string;
+  suggestion: string | null;
+  evidence: ContractFindingEvidence[];
+  source: 'rule' | 'model';
+}
+
 /** رد POST /api/contracts وGET /api/contracts/{id} — يطابق ContractResponseDto */
 export interface ContractResponse {
   id: string;
@@ -723,6 +743,10 @@ export interface ContractResponse {
   client_party?: 'first' | 'second' | null;
   /** تحذيرات غير حاجبة من مرحلة التقسيم (مثال: ترقيم بنود غير متسلسل) */
   warnings?: string[];
+  /** ملاحظات العقد ككل (الجولة 3)؛ غائبة/فارغة للعقود التى لم تُحلَّل */
+  contract_findings?: ContractFinding[];
+  /** حالة تمرير النموذج على العقد كاملاً (فحص التعارض) */
+  contract_findings_model?: 'ok' | 'not_configured' | 'skipped' | 'error' | null;
   clauses?: ContractClauseItem[];
   created_at: string;
 }

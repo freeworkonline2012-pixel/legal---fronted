@@ -37,6 +37,7 @@ import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 import { isGuestUser } from '@/lib/guest';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { ExportButtons } from '@/components/ui/ExportButtons';
+import { ContractFindingsPanel } from './ContractFindingsPanel';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
 import { DisclaimerBanner } from '@/components/ui/DisclaimerBanner';
@@ -416,6 +417,8 @@ export function ContractsScreen() {
                         </ul>
                       </div>
                     ) : null}
+
+                    <ContractFindingsPanel findings={result.contract_findings} model={result.contract_findings_model ?? null} />
 
                     {result.clauses && result.clauses.length > 0 ? (
                       result.clauses.map((clause) => <ContractClauseCard key={clause.id} clause={clause} contractId={result.id} />)
