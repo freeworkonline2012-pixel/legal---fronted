@@ -140,6 +140,8 @@ export async function registerUser(input: {
   email: string;
   password: string;
   full_name?: string;
+  /** موافقة صريحة على سياسة الخصوصية (151/2020) — يشترط backend قيمتها true حرفياً وإلا يرفض الطلب بـ400 */
+  consent: boolean;
 }): Promise<UserResponse> {
   return requestJson<UserResponse>('/auth/register', {
     method: 'POST',

@@ -120,6 +120,49 @@ describe('LoginPage', () => {
     expect(mockedRegisterUser).not.toHaveBeenCalled();
   });
 
+  it('إنشاء حساب: يرسل consent=true إلى registerUser (يشترطه backend وإلا يرفض بـ400)', async () => {
+    const user = userEvent.setup();
+    mockedRegisterUser.mockResolvedValue({
+      id: 'u-1',
+      email: 'user@example.com',
+      full_name: null,
+      role: 'user',
+      created_at: '2026-10-24T10:00:00.000Z',
+    } as Awaited<ReturnType<typeof registerUser>>);
+    mockedLoginUser.mockResolvedValue(SESSION);
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'حساب جديد' }));
+    await user.type(screen.getByLabelText(/البريد الإلكتروني/), 'user@example.com');
+    await user.type(screen.getByLabelText(/كلمة المرور/), 'password123');
+    await user.click(screen.getByLabelText(/أوافق على معالجة بياناتي/));
+    await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }));
+
+    await waitFor(() => {
+      expect(mockedRegisterUser).toHaveBeenCalledWith({
+        email: 'user@example.com',
+        password: 'password123',
+        consent: true,
+      });
+    });
+  });
+
+  it('تسجيل مغلق (403) فى وضع المستخدم الواحد: رسالة محددة بدل «بيانات غير صحيحة»', async () => {
+    const user = userEvent.setup();
+    mockedRegisterUser.mockRejectedValue(new Error('فشل طلب الخلفية (HTTP 403)'));
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'حساب جديد' }));
+    await user.type(screen.getByLabelText(/البريد الإلكتروني/), 'other@example.com');
+    await user.type(screen.getByLabelText(/كلمة المرور/), 'password123');
+    await user.click(screen.getByLabelText(/أوافق على معالجة بياناتي/));
+    await user.click(screen.getByRole('button', { name: 'إنشاء الحساب' }));
+
+    const matches = await screen.findAllByText(/التسجيل مغلق/);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(screen.queryByText(/بيانات الدخول غير صحيحة/)).not.toBeInTheDocument();
+  });
+
   it('تسجيل دخول ناجح: يستدعي loginUser بالبيانات ويوجّه إلى /chat', async () => {
     const user = userEvent.setup();
     mockedLoginUser.mockResolvedValue(SESSION);

@@ -77,7 +77,7 @@ export default function LoginPage() {
 
       // حساب جديد: عقد backend يعيد UserResponse بلا توكنات — نُسجّل دخولاً تلقائياً
       // بالبيانات نفسها للحصول على الجلسة (حل أمامي لا يعدّل عقد backend).
-      await registerUser({ email: email.trim(), password });
+      await registerUser({ email: email.trim(), password, consent });
       try {
         const session = await loginUser({ email: email.trim(), password });
         setAuthSession(session);
@@ -90,10 +90,14 @@ export default function LoginPage() {
       // 409 = البريد مسجّل مسبقاً (ConflictException في backend auth.service.ts) —
       // رسالة محددة بدل رسالة «بيانات غير صحيحة» العامة المضلّلة في وضع إنشاء الحساب.
       const isConflict = error instanceof Error && error.message.includes('409');
+      // 403 عند التسجيل = المنصة فى وضع المستخدم الواحد والبريد خارج القائمة المسموحة
+      const isClosed = error instanceof Error && error.message.includes('403');
       const message =
         mode === 'signup' && isConflict
           ? 'هذا البريد مسجّل مسبقاً — سجّل دخولك مباشرة من تبويب «تسجيل الدخول».'
-          : error instanceof Error && error.message.includes('HTTP 4')
+          : mode === 'signup' && isClosed
+            ? 'التسجيل مغلق — المنصة مخصصة لمستخدم واحد.'
+            : error instanceof Error && error.message.includes('HTTP 4')
             ? 'بيانات الدخول غير صحيحة — تحقق من البريد وكلمة المرور.'
             : 'تعذّر الاتصال بالخادم — تأكد من تشغيل الخلفية وحاول مرة أخرى.';
       setErrors((prev) => ({ ...prev, server: message }));

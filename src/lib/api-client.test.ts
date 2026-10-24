@@ -265,14 +265,14 @@ describe('api-client', () => {
         }),
       );
 
-      const result = await registerUser({ email: 'a@b.com', password: 'secret' });
+      const result = await registerUser({ email: 'a@b.com', password: 'secret', consent: true });
 
       expect(result.role).toBe('user');
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/auth/register'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ email: 'a@b.com', password: 'secret' }),
+          body: JSON.stringify({ email: 'a@b.com', password: 'secret', consent: true }),
         }),
       );
     });
