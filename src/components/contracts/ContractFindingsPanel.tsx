@@ -4,6 +4,7 @@
  */
 import { ListChecks } from 'lucide-react';
 import type { ContractFinding, ContractResponse } from '@/lib/types';
+import { VerificationNote } from './VerificationNote';
 
 const SEVERITY_STYLE: Record<ContractFinding['severity'], string> = {
   حرج: 'bg-error-soft text-error',
@@ -56,6 +57,9 @@ export function ContractFindingsPanel({ findings, model }: Props) {
                   </span>
                   <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-caption text-text-secondary">{f.kind_label}</span>
                   <span className="font-semibold">{f.title}</span>
+                  {f.verification?.status === 'unconfirmed' ? (
+                    <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-caption font-semibold text-warning">غير مؤكدة</span>
+                  ) : null}
                 </summary>
                 <div className="space-y-2 border-t border-border-default px-3 py-3 text-body-sm text-text-secondary">
                   <p>{f.explanation}</p>
@@ -69,6 +73,7 @@ export function ContractFindingsPanel({ findings, model }: Props) {
                       ))}
                     </ul>
                   ) : null}
+                  <VerificationNote verification={f.verification} />
                   {f.suggestion ? (
                     <p>
                       <span className="font-semibold text-text-primary">المعالجة المقترحة: </span>

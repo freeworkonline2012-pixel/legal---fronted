@@ -18,6 +18,7 @@ import { criteriaLabels } from '@/lib/contract-criteria';
 import { Button } from '@/components/ui/Button';
 import { ClauseAssessmentBadge } from '@/components/ui/ClauseAssessmentBadge';
 import { MatchedArticleRow } from './MatchedArticleRow';
+import { VerificationNote } from './VerificationNote';
 
 export interface ContractClauseCardProps {
   clause: ContractClauseItem;
@@ -87,6 +88,8 @@ export function ContractClauseCard({ clause, defaultTextExpanded = false, contra
           <p className="text-body-sm text-text-secondary">{clause.assessment_reasoning}</p>
         </div>
       ) : null}
+
+      <VerificationNote verification={clause.verification} />
 
       {clause.matched_articles && clause.matched_articles.length > 0 ? (
         <div className="mt-3 space-y-2">

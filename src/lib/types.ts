@@ -684,6 +684,15 @@ export interface MatchedArticle {
 }
 
 /** بند واحد من عقد — يطابق ContractClauseResponseDto */
+/** نتيجة المدقق المستقل (مدقق ثانٍ بتعليمات معاكسة) — يطابق VerificationDto؛ null = لم يُجرَ التحقق */
+export interface VerificationResult {
+  status: 'confirmed' | 'unconfirmed';
+  /** confirmed | refuted (اعتراض مسنَد باقتباس موثَّق) | uncertain (شك أو اعتراض بلا اقتباس) */
+  basis: 'confirmed' | 'refuted' | 'uncertain';
+  reason: string;
+  quote: string | null;
+}
+
 export interface ContractClauseItem {
   id: string;
   clause_index: number;
@@ -697,6 +706,8 @@ export interface ContractClauseItem {
   assessment_reasoning: string | null;
   matched_articles: MatchedArticle[] | null;
   assessment_confidence: number | null;
+  /** نتيجة التحقق المستقل من ملاحظة البند (للبنود التى قيّمها النموذج بمخاطرة غير منخفضة) */
+  verification?: VerificationResult | null;
   /** صياغة بديلة مقترحة (تُولَّد عند الطلب وبعد فحوص أمان آلية؛ للاسترشاد وتُراجَع من محامٍ) */
   suggested_redraft?: SuggestedRedraft | null;
 }
@@ -728,6 +739,7 @@ export interface ContractFinding {
   suggestion: string | null;
   evidence: ContractFindingEvidence[];
   source: 'rule' | 'model';
+  verification?: VerificationResult | null;
 }
 
 /** رد POST /api/contracts وGET /api/contracts/{id} — يطابق ContractResponseDto */
