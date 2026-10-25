@@ -476,11 +476,13 @@ export async function fetchContract(id: string): Promise<ContractResponse> {
 /* ------------------------------------------------------------------------ */
 
 export type ExportKind = 'answers' | 'governance' | 'contracts' | 'memos';
-export type ExportFormat = 'pdf' | 'docx';
+/** tracked: نسخة Word من العقد بتعديلات متتبَّعة (للعقود فقط) */
+export type ExportFormat = 'pdf' | 'docx' | 'tracked';
 
 const EXPORT_FALLBACK_NAMES: Record<ExportFormat, string> = {
   pdf: 'document.pdf',
   docx: 'document.docx',
+  tracked: 'contract-tracked.docx',
 };
 
 /** يستخرج اسم الملف من Content-Disposition (ASCII فقط من الخادم) أو يعيد null */
@@ -514,7 +516,8 @@ export async function downloadExport(kind: ExportKind, id: string, format: Expor
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/exports/${kind}/${encodeURIComponent(id)}?format=${format}`, {
+    const path = format === 'tracked' ? `/exports/contracts/${encodeURIComponent(id)}/tracked` : `/exports/${kind}/${encodeURIComponent(id)}?format=${format}`;
+    res = await fetch(`${API_BASE_URL}${path}`, {
       headers,
       cache: 'no-store',
     });

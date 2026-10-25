@@ -25,9 +25,11 @@ export interface ExportButtonsProps {
   id: string;
   /** عنوان قصير يسبق الأزرار، مثال: «تنزيل الإجابة» */
   label?: string;
+  /** زر إضافى: نسخة Word من العقد بتعديلات متتبَّعة (للعقود فقط) */
+  trackedChanges?: boolean;
 }
 
-export function ExportButtons({ kind, id, label = 'تنزيل المستند' }: ExportButtonsProps) {
+export function ExportButtons({ kind, id, label = 'تنزيل المستند', trackedChanges = false }: ExportButtonsProps) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState<ExportFormat | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +93,18 @@ export function ExportButtons({ kind, id, label = 'تنزيل المستند' }:
         >
           Word
         </Button>
+        {trackedChanges && kind === 'contracts' ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={busy === 'tracked'}
+            disabled={busy !== null}
+            onClick={() => void handle('tracked')}
+            aria-label={`${label} بصيغة Word بتعديلات متتبَّعة`}
+          >
+            Word بتعديلات متتبَّعة
+          </Button>
+        ) : null}
       </div>
       {error ? (
         <p role="alert" className="text-body-sm text-error">

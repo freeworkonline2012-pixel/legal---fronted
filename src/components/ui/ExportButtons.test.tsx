@@ -44,6 +44,22 @@ describe('ExportButtons', () => {
     expect(mockedDownload).toHaveBeenLastCalledWith('answers', 'a-1', 'docx');
   });
 
+  it('زر النسخة المتتبَّعة يظهر للعقود فقط وبطلب صريح، ويستدعى التنزيل بصيغة tracked', async () => {
+    setAuthSession(SESSION);
+    mockedDownload.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    const { rerender } = render(<ExportButtons kind="contracts" id="c-1" label="تنزيل تقرير المراجعة" />);
+    await screen.findByRole('button', { name: /بصيغة PDF/ });
+    expect(screen.queryByRole('button', { name: /متتبَّعة/ })).not.toBeInTheDocument();
+
+    rerender(<ExportButtons kind="answers" id="a-1" trackedChanges />);
+    expect(screen.queryByRole('button', { name: /متتبَّعة/ })).not.toBeInTheDocument();
+
+    rerender(<ExportButtons kind="contracts" id="c-1" label="تنزيل تقرير المراجعة" trackedChanges />);
+    await user.click(await screen.findByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة Word بتعديلات متتبَّعة' }));
+    expect(mockedDownload).toHaveBeenCalledWith('contracts', 'c-1', 'tracked');
+  });
+
   it('يعرض رسالة الفشل ويعيد تمكين الأزرار', async () => {
     setAuthSession(SESSION);
     mockedDownload.mockRejectedValue(new ApiError(409, 'التقرير قيد المراجعة البشرية وسيتاح للتنزيل فور اعتماده.'));

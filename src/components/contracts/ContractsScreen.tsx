@@ -380,7 +380,7 @@ export function ContractsScreen() {
                         فتظهر تحت الزر (والمدير وحده يُنزِّل المسودة ويعتمدها). */}
                     {result.status === 'processed' ? (
                       <div className="space-y-3 rounded-lg border border-border-default bg-surface p-4">
-                        <ExportButtons kind="contracts" id={result.id} label="تنزيل تقرير المراجعة" />
+                        <ExportButtons kind="contracts" id={result.id} label="تنزيل تقرير المراجعة" trackedChanges />
                         {isAdmin ? (
                           <div className="flex flex-wrap items-center gap-2 border-t border-border-default pt-3">
                             <Button

@@ -97,6 +97,15 @@ describe('downloadExport', () => {
     expect(clicked?.download).toBe('document.docx');
   });
 
+  it('النسخة المتتبَّعة: مسار العقد الخاص بلا صيغة فى الاستعلام، واسم احتياطى بامتداد docx', async () => {
+    mockFetch.mockResolvedValue(fileResponse(null));
+    await downloadExport('contracts', 'c-1', 'tracked');
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/exports/contracts/c-1/tracked');
+    expect(url).not.toContain('format=');
+    expect(clicked?.download).toBe('contract-tracked.docx');
+  });
+
   it('يلغى رابط الكائن بعد مهلة', async () => {
     mockFetch.mockResolvedValue(fileResponse(null));
     await downloadExport('contracts', 'c-1', 'pdf');
