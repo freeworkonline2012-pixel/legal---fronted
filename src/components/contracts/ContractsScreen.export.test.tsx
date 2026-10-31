@@ -69,6 +69,14 @@ describe('ContractsScreen — تنزيل التقرير واعتماده', () =>
     expect(screen.queryByRole('button', { name: /اعتماد التقرير/ })).not.toBeInTheDocument();
   });
 
+  it('يعرض نسخة المحامى الكاملة ونسخة العميل المبسطة جنباً إلى جنب', async () => {
+    setAuthSession(session('user'));
+    await upload(PROCESSED);
+    expect(await screen.findByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة Word' })).toBeInTheDocument();
+  });
+
   it('لا يظهر التنزيل عند فشل استخراج النص', async () => {
     setAuthSession(session('user'));
     await upload(FAILED);

@@ -106,6 +106,24 @@ describe('downloadExport', () => {
     expect(clicked?.download).toBe('contract-tracked.docx');
   });
 
+  it('نسخة العميل: يضيف audience=client لتقرير العقد فقط، باسم احتياطى مميز', async () => {
+    mockFetch.mockResolvedValue(fileResponse(null));
+    await downloadExport('contracts', 'c-1', 'pdf', 'client');
+    expect(mockFetch.mock.calls[0][0]).toContain('/exports/contracts/c-1?format=pdf&audience=client');
+    expect(clicked?.download).toBe('contract-client.pdf');
+
+    await downloadExport('contracts', 'c-1', 'docx', 'client');
+    expect(mockFetch.mock.calls[1][0]).toContain('format=docx&audience=client');
+
+    // الافتراضى بلا audience، وغير العقود لا يتأثر، والمتتبَّعة لا تتغير
+    await downloadExport('contracts', 'c-1', 'pdf');
+    expect(mockFetch.mock.calls[2][0]).not.toContain('audience');
+    await downloadExport('answers', 'a-1', 'pdf', 'client');
+    expect(mockFetch.mock.calls[3][0]).not.toContain('audience');
+    await downloadExport('contracts', 'c-1', 'tracked', 'client');
+    expect(mockFetch.mock.calls[4][0]).not.toContain('audience');
+  });
+
   it('يلغى رابط الكائن بعد مهلة', async () => {
     mockFetch.mockResolvedValue(fileResponse(null));
     await downloadExport('contracts', 'c-1', 'pdf');

@@ -84,3 +84,46 @@ describe('ExportButtons', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /بصيغة Word/ })).toBeEnabled());
   });
 });
+
+describe('ExportButtons — نسخة العميل لتقرير العقد', () => {
+  beforeEach(() => {
+    mockedDownload.mockReset();
+    clearAuthSession();
+  });
+
+  it('لا تظهر مجموعة نسخة العميل إلا بطلب صريح وللعقود فقط', async () => {
+    setAuthSession(SESSION);
+    const { rerender } = render(<ExportButtons kind="contracts" id="c-1" label="تنزيل تقرير المراجعة" />);
+    await screen.findByRole('button', { name: /بصيغة PDF/ });
+    expect(screen.queryByTestId('export-contracts-client')).not.toBeInTheDocument();
+    rerender(<ExportButtons kind="answers" id="a-1" clientEdition />);
+    expect(screen.queryByTestId('export-contracts-client')).not.toBeInTheDocument();
+  });
+
+  it('زرّا PDF وWord للعميل يستدعيان التنزيل بوسيط العميل، وزرّا المحامى بلا وسيط', async () => {
+    setAuthSession(SESSION);
+    mockedDownload.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<ExportButtons kind="contracts" id="c-1" label="تنزيل تقرير المراجعة" trackedChanges clientEdition />);
+
+    await user.click(await screen.findByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة PDF' }));
+    expect(mockedDownload).toHaveBeenLastCalledWith('contracts', 'c-1', 'pdf', 'client');
+    await user.click(screen.getByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة Word' }));
+    expect(mockedDownload).toHaveBeenLastCalledWith('contracts', 'c-1', 'docx', 'client');
+
+    await user.click(screen.getByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' }));
+    expect(mockedDownload).toHaveBeenLastCalledWith('contracts', 'c-1', 'pdf');
+  });
+
+  it('يمنع تنزيلين متزامنين عبر المجموعتين', async () => {
+    setAuthSession(SESSION);
+    let resolve: () => void = () => undefined;
+    mockedDownload.mockReturnValue(new Promise<void>((r) => { resolve = r; }));
+    const user = userEvent.setup();
+    render(<ExportButtons kind="contracts" id="c-1" label="تنزيل تقرير المراجعة" clientEdition />);
+    await user.click(await screen.findByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة PDF' }));
+    expect(screen.getByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).toBeDisabled();
+    resolve();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).toBeEnabled());
+  });
+});

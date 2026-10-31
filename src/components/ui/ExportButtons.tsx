@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FileDown } from 'lucide-react';
 import { ApiError, downloadExport } from '@/lib/api-client';
-import type { ExportFormat, ExportKind } from '@/lib/api-client';
+import type { ExportAudience, ExportFormat, ExportKind } from '@/lib/api-client';
 import { isAuthenticated } from '@/lib/auth';
 import { Button } from './Button';
 
@@ -27,11 +27,15 @@ export interface ExportButtonsProps {
   label?: string;
   /** زر إضافى: نسخة Word من العقد بتعديلات متتبَّعة (للعقود فقط) */
   trackedChanges?: boolean;
+  /** للعقود فقط: مجموعة أزرار ثانية لنسخة العميل المبسطة (الأولى هى تقرير المحامى الكامل) */
+  clientEdition?: boolean;
+  /** عنوان مجموعة نسخة العميل */
+  clientLabel?: string;
 }
 
-export function ExportButtons({ kind, id, label = 'تنزيل المستند', trackedChanges = false }: ExportButtonsProps) {
+export function ExportButtons({ kind, id, label = 'تنزيل المستند', trackedChanges = false, clientEdition = false, clientLabel = 'تنزيل نسخة العميل المبسطة' }: ExportButtonsProps) {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,11 +58,12 @@ export function ExportButtons({ kind, id, label = 'تنزيل المستند', t
     );
   }
 
-  async function handle(format: ExportFormat): Promise<void> {
-    setBusy(format);
+  async function handle(format: ExportFormat, audience: ExportAudience = 'lawyer'): Promise<void> {
+    setBusy(audience === 'client' ? `client:${format}` : format);
     setError(null);
     try {
-      await downloadExport(kind, id, format);
+      if (audience === 'client') await downloadExport(kind, id, format, 'client');
+      else await downloadExport(kind, id, format);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'تعذّر تنزيل المستند — حاول مرة أخرى.');
     } finally {
@@ -106,6 +111,34 @@ export function ExportButtons({ kind, id, label = 'تنزيل المستند', t
           </Button>
         ) : null}
       </div>
+      {clientEdition && kind === 'contracts' ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="export-contracts-client">
+          <span className="flex items-center gap-1 text-body-sm font-medium text-text-secondary">
+            <FileDown className="h-4 w-4" aria-hidden="true" />
+            {clientLabel}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={busy === 'client:pdf'}
+            disabled={busy !== null}
+            onClick={() => void handle('pdf', 'client')}
+            aria-label={`${clientLabel} بصيغة PDF`}
+          >
+            PDF
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={busy === 'client:docx'}
+            disabled={busy !== null}
+            onClick={() => void handle('docx', 'client')}
+            aria-label={`${clientLabel} بصيغة Word`}
+          >
+            Word
+          </Button>
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="text-body-sm text-error">
           {error}

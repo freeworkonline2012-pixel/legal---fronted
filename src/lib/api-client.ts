@@ -478,6 +478,8 @@ export async function fetchContract(id: string): Promise<ContractResponse> {
 export type ExportKind = 'answers' | 'governance' | 'contracts' | 'memos';
 /** tracked: نسخة Word من العقد بتعديلات متتبَّعة (للعقود فقط) */
 export type ExportFormat = 'pdf' | 'docx' | 'tracked';
+/** لتقرير العقد: lawyer = التقرير الكامل (الافتراضى)، client = نسخة العميل المبسطة */
+export type ExportAudience = 'lawyer' | 'client';
 
 const EXPORT_FALLBACK_NAMES: Record<ExportFormat, string> = {
   pdf: 'document.pdf',
@@ -509,14 +511,15 @@ function exportErrorMessage(status: number, backendMessage: string | undefined, 
  * يجلب الملف مع التوكن ويطلق تنزيل المتصفح. يرمي ApiError برسالة عربية صالحة للعرض.
  * المصادقة إلزامية؛ المالك أو admin فقط (غير ذلك 404 من الخادم).
  */
-export async function downloadExport(kind: ExportKind, id: string, format: ExportFormat): Promise<void> {
+export async function downloadExport(kind: ExportKind, id: string, format: ExportFormat, audience: ExportAudience = 'lawyer'): Promise<void> {
   const headers: Record<string, string> = {};
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   let res: Response;
   try {
-    const path = format === 'tracked' ? `/exports/contracts/${encodeURIComponent(id)}/tracked` : `/exports/${kind}/${encodeURIComponent(id)}?format=${format}`;
+    const audienceQuery = kind === 'contracts' && format !== 'tracked' && audience === 'client' ? '&audience=client' : '';
+    const path = format === 'tracked' ? `/exports/contracts/${encodeURIComponent(id)}/tracked` : `/exports/${kind}/${encodeURIComponent(id)}?format=${format}${audienceQuery}`;
     res = await fetch(`${API_BASE_URL}${path}`, {
       headers,
       cache: 'no-store',
@@ -537,7 +540,8 @@ export async function downloadExport(kind: ExportKind, id: string, format: Expor
   }
 
   const blob = await res.blob();
-  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? EXPORT_FALLBACK_NAMES[format];
+  const fallback = kind === 'contracts' && audience === 'client' && format !== 'tracked' ? `contract-client.${format}` : EXPORT_FALLBACK_NAMES[format];
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? fallback;
   const url = URL.createObjectURL(blob);
   try {
     const link = document.createElement('a');
