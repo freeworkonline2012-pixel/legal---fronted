@@ -391,8 +391,14 @@ export async function postGovernanceAssess(
  * 401 متوقَّع دائماً بلا جلسة (مصادقة إلزامية) — المكوّن المستدعى مسؤول عن
  * التحقق من isAuthenticated() قبل عرض نموذج الرفع أصلاً (راجع ContractsScreen).
  */
-export async function uploadContract(file: File, position?: ContractPosition | null): Promise<ContractResponse> {
+export async function uploadContract(
+  file: File,
+  position?: ContractPosition | null,
+  options?: { background?: boolean },
+): Promise<ContractResponse> {
   const formData = new FormData();
+  // background: يعود الطلب فوراً بحالة «قيد المعالجة» ويتابع المتصفح الحالة (عقود طويلة وممسوحة حتى 34 صفحة)
+  if (options?.background) formData.append('background', 'true');
   // حقول مركز العميل تسبق الملف (اختيارية): الخادم ينقّيها، وغيابها = تدقيق محايد
   if (position?.contract_type) formData.append('contract_type', position.contract_type);
   if (position?.client_role) formData.append('client_role', position.client_role);

@@ -760,6 +760,8 @@ export interface ContractResponse {
   /** حالة تمرير النموذج على العقد كاملاً (فحص التعارض) */
   contract_findings_model?: 'ok' | 'not_configured' | 'skipped' | 'error' | null;
   clauses?: ContractClauseItem[];
+  /** تقدم التحليل أثناء المعالجة (status=processing): المرحلة بنص عربى جاهز ونسبتها؛ null بعد الانتهاء */
+  processing?: { stage: string; label: string; done: number; total: number } | null;
   created_at: string;
 }
 

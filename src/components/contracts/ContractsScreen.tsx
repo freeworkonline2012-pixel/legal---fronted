@@ -32,7 +32,8 @@ import {
   positionFromAnswers,
   type ContractPosition,
 } from '@/lib/contract-position';
-import { ApiError, approveContractReport, uploadContract } from '@/lib/api-client';
+import { ApiError, approveContractReport, fetchContract, uploadContract } from '@/lib/api-client';
+import { describeProgress, waitForContract } from '@/lib/contract-poll';
 import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 import { isGuestUser } from '@/lib/guest';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -75,6 +76,9 @@ export function ContractsScreen() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<ScreenStatus>('idle');
   const [progressIndex, setProgressIndex] = useState(0);
+  /** تقدم حقيقى من الخادم أثناء التحليل الخلفى (يحلّ محل الخطوات التقديرية متى وصل) */
+  const [serverProgress, setServerProgress] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
   const [result, setResult] = useState<ContractResponse | null>(null);
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -95,6 +99,10 @@ export function ContractsScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthed(isAuthenticated());
     setIsAdmin(getCurrentUser()?.role === 'admin');
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true; // مغادرة الصفحة توقف المتابعة (التحليل نفسه يكمل فى الخادم)
+    };
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -116,22 +124,36 @@ export function ContractsScreen() {
       setValidationError('اختر ملف عقد أولاً (PDF أو DOCX).');
       return;
     }
+    cancelledRef.current = false;
     setStatus('loading');
     setResult(null);
     setErrorMessage(null);
     setProgressIndex(0);
+    setServerProgress(null);
 
     const progressTimer = setInterval(() => {
       setProgressIndex((prev) => Math.min(prev + 1, MAX_PROGRESS_INDEX));
     }, PROGRESS_TICK_MS);
 
     try {
-      const response = await uploadContract(file, position);
+      const accepted = await uploadContract(file, position, { background: true });
+      // خادم قديم يعود بالنتيجة كاملة؛ الجديد يعود «قيد المعالجة» فنتابعه حتى ينتهى (الحد الأقصى 34 صفحة للممسوح)
+      const response = await waitForContract(accepted, {
+        fetchContract,
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        now: () => Date.now(),
+        onUpdate: (c) => setServerProgress(describeProgress(c.processing)),
+        isCancelled: () => cancelledRef.current,
+        isFatal: (e) => e instanceof ApiError && [401, 403, 404].includes(e.status),
+      });
       setResult(response);
       setStatus('done');
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return; // غادر المستخدم الصفحة
       const message =
-        err instanceof ApiError
+        err instanceof Error && err.name === 'PollTimeoutError'
+          ? err.message
+          : err instanceof ApiError
           ? err.status === 0
             ? 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.'
             : err.status === 401
@@ -327,7 +349,13 @@ export function ContractsScreen() {
           <div className="mt-6 space-y-4" aria-live="polite">
             {status === 'loading' ? (
               <div className="space-y-4">
-                <ProgressSteps steps={UPLOAD_PROGRESS_STEPS} currentIndex={progressIndex} />
+                {serverProgress ? (
+                  <p role="status" className="text-body text-text-primary">
+                    جارٍ تحليل العقد: {serverProgress}… قد يستغرق العقد الطويل الممسوح عدة دقائق؛ يمكنك إبقاء هذه الصفحة مفتوحة.
+                  </p>
+                ) : (
+                  <ProgressSteps steps={UPLOAD_PROGRESS_STEPS} currentIndex={progressIndex} />
+                )}
                 <CitationCardSkeleton />
               </div>
             ) : null}
