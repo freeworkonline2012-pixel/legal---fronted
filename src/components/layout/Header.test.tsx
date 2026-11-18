@@ -67,8 +67,10 @@ describe('Header', () => {
     expect(screen.queryByRole('link', { name: 'الأدلة الإرشادية' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'المذكرات القانونية' })).toHaveAttribute('href', '/memos');
     expect(screen.getByRole('link', { name: 'الحوكمة والالتزام' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'تدقيق العقود' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'ترجمة العقود' })).toHaveAttribute('href', '/translation');
+    // خدمات العقود الثلاث داخل قائمة «العقود القانونية» المنسدلة (2026-11-18) — لا روابط منفصلة فى الشريط.
+    expect(screen.getByRole('button', { name: 'العقود القانونية' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'تدقيق العقود' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'ترجمة العقود' })).not.toBeInTheDocument();
     // أُخفيا من القائمة العلوية بطلب صريح 2026-09-05 — الصفحتان (/login،
     // /pricing) تبقيان تعملان، فقط أُزيل الرابطان من التنقل الرئيسى.
     expect(screen.queryByRole('link', { name: 'اشترك' })).not.toBeInTheDocument();

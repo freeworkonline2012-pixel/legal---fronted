@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { LogOut, Scale } from 'lucide-react';
 import { ThemeToggle } from '@/lib/theme';
+import { ContractsMenu } from '@/components/layout/ContractsMenu';
 import { ButtonLink } from '@/components/ui/Button';
 import { logoutUser } from '@/lib/api-client';
 import { clearAuthSession, getCurrentUser, getRefreshToken, isAuthenticated } from '@/lib/auth';
@@ -88,7 +89,7 @@ export function Header({ showAuth = true }: HeaderProps) {
 
         <nav aria-label="التنقل الرئيسي" className="flex items-center gap-1 sm:gap-2">
           {/* ترتيب القائمة (أُعيد ترتيبه بالكامل 2026-09-05 بطلب صريح):
-              الرئيسية - القوانين - القرارات - تدقيق العقود - ترجمة العقود -
+              الرئيسية - القوانين - القرارات - العقود القانونية (قائمة منسدلة) -
               الحوكمة والالتزام - المذكرات القانونية - [تبديل الوضع] -
               جرّب مجاناً (أو البريد/خروج عند وجود جلسة).
               تحديث لاحق (نفس اليوم 2026-09-05، بطلب صريح): "تسجيل الدخول"
@@ -117,26 +118,11 @@ export function Header({ showAuth = true }: HeaderProps) {
           {/* نُقل «اللوائح التنفيذية» و«الأدلة الإرشادية» (2026-10-16، بطلب صريح) من هذه القائمة العلوية
               إلى «المكتبة القانونية» فى القائمة الجانبية (MainSidebar) — الصفحتان /regulations و/guidance
               تعملان كما هما ويبقى الوصول إليهما من هناك. */}
-          {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة المدقق القانونى للعقود
-              (Service 2) — كانت API فقط بلا أى صفحة (Phase 3+4 مؤجَّلتان).
-              بخلاف كل الروابط الأخرى هنا، هذه الصفحة تتطلب تسجيل دخول إلزامياً
-              فى backend (بيانات عقود عمل حقيقية) — الرابط يبقى ظاهراً دائماً
-              (بلا شرط showAuth) لأن الصفحة نفسها تتولى دعوة غير المسجَّل
-              لتسجيل الدخول (راجع ContractsScreen)، بدل إخفاء الرابط بالكامل. */}
-          <Link
-            href="/contracts"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            تدقيق العقود
-          </Link>
-          {/* أُضيف 2026-10-16: الترجمة القانونية للعقود (عربى <-> إنجليزى) بجوار تدقيق العقود؛
-              الصفحة تتطلب حساباً وتتولى دعوة غير المسجَّل لتسجيل الدخول بنفسها. */}
-          <Link
-            href="/translation"
-            className="hidden min-h-[44px] items-center rounded-md px-3 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary focus-visible:outline-none md:inline-flex"
-          >
-            ترجمة العقود
-          </Link>
+          {/* «العقود القانونية» (2026-11-18، بطلب صريح): قائمة منسدلة تضم خدمات العقود الثلاث —
+              صياغة العقود، ترجمة العقود، مراجعة العقود (كانت «تدقيق العقود») — بدل الرابطين المنفصلين.
+              المسارات لم تتغير (/contracts و/translation)، وأُضيف /contract-drafting. الصفحات تتطلب
+              حساباً وتتولى دعوة غير المسجَّل لتسجيل الدخول بنفسها (كما كان). المصدر: lib/contract-services. */}
+          <ContractsMenu />
           {/* أُضيف 2026-09-05: أول واجهة أمامية لخدمة الحوكمة (Service 3) —
               كانت API فقط بلا أى صفحة (Phase 3 مؤجَّلة). الرابط ظاهر عمداً بنفس
               شكل باقى القائمة (لا "تجريبي" فى نص الرابط نفسه) لأن الصفحة نفسها

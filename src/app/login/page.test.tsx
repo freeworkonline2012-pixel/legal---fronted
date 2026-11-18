@@ -26,6 +26,8 @@ const mockPush = jest.fn();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  // الهيدر (قائمة «العقود القانونية») يقرأ المسار الحالى.
+  usePathname: () => '/',
 }));
 
 jest.mock('@/lib/api-client', () => ({

@@ -1,5 +1,5 @@
 /**
- * مكوّن ContractsScreen — شاشة "المدقق القانونى للعقود" (خدمة Service 2).
+ * مكوّن ContractsScreen — شاشة "مراجعة العقود" (خدمة Service 2؛ كانت «المدقق القانونى للعقود»، أُعيد تسميتها 2026-11-18).
  *
  * ⚠️ ملاحظة نطاق مهمة (اقرأ قبل التعديل): هذه أول واجهة أمامية لخدمة كانت حتى
  * 2026-09-05 بلا أى صفحة (API فقط، Phase 1+2 الأساسية فى backend — راجع
@@ -235,7 +235,7 @@ export function ContractsScreen() {
     <main className="mx-auto w-full max-w-[860px] flex-1 px-4 pb-28 pt-6 sm:px-8 lg:pb-10">
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <ScrollText className="h-10 w-10 text-primary" aria-hidden="true" />
-        <h1 className="text-h2 font-bold text-text-primary">المدقق القانونى للعقود</h1>
+        <h1 className="text-h2 font-bold text-text-primary">مراجعة العقود</h1>
       </div>
 
       {authed === false ? (

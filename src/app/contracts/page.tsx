@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { ContractsScreen } from '@/components/contracts/ContractsScreen';
 
 export const metadata: Metadata = {
-  title: 'المدقق القانونى للعقود — منصة قانونية عربية',
+  title: 'مراجعة العقود — منصة قانونية عربية',
   description:
     'ارفع عقداً (PDF أو DOCX) لاستخراج بنوده وتقييمها الأولى مقابل النصوص القانونية المصرية المفهرَسة.',
 };
