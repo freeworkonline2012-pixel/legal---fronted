@@ -48,6 +48,7 @@ import type {
 } from './types';
 import { getAccessToken } from './auth';
 import type { ContractPosition } from './contract-position';
+import type { DraftRequest, DraftResult, DraftTypeSpec } from './drafting';
 
 export interface ApiHealthResponse {
   status: string;
@@ -775,6 +776,114 @@ export async function downloadTranslation(id: string, format: ExportFormat, layo
   });
   const blob = await res.blob();
   const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? EXPORT_FALLBACK_NAMES[format];
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* صياغة العقود (الخلفية: src/drafting) — حتمية، لا تخزّن شيئاً من العقد       */
+/* ------------------------------------------------------------------------ */
+
+/** خطأ تحقق من الإجابات: 400 مع أخطاء كل حقل (field_errors) لعرضها تحت الحقل نفسه. */
+export class DraftFieldError extends ApiError {
+  readonly fieldErrors: Record<string, string>;
+
+  constructor(message: string, fieldErrors: Record<string, string>) {
+    super(400, message);
+    this.name = 'DraftFieldError';
+    this.fieldErrors = fieldErrors;
+  }
+}
+
+function draftHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function draftFailure(res: Response, what: string): Promise<ApiError> {
+  let body: { message?: unknown; field_errors?: unknown } = {};
+  try {
+    body = (await res.json()) as typeof body;
+  } catch {
+    // جسم غير JSON — الرسالة العامة تكفى
+  }
+  if (res.status === 401) return new ApiError(401, `سجّل الدخول أولاً ${what}.`);
+  if (res.status === 429) return new ApiError(429, 'طلبات كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.');
+  if (res.status === 400) {
+    const fe = body.field_errors;
+    if (fe && typeof fe === 'object') {
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(fe as Record<string, unknown>)) if (typeof v === 'string') clean[k] = v;
+      return new DraftFieldError('بعض الإجابات تحتاج تصحيحاً — راجع الحقول المعلَّمة.', clean);
+    }
+    return new ApiError(400, 'بعض المدخلات غير صالحة — راجع الحقول وحاول مجدداً.');
+  }
+  if (res.status === 503) return new ApiError(503, 'الخدمة غير متاحة مؤقتاً — حاول بعد قليل.');
+  return new ApiError(res.status, `تعذّر ${what} (HTTP ${res.status}) — حاول مرة أخرى.`);
+}
+
+/** GET /api/drafting/types — أنواع العقود المدعومة وأسئلة كل نوع. */
+export async function fetchDraftTypes(): Promise<DraftTypeSpec[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/drafting/types`, { headers: draftHeaders(), cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await draftFailure(res, 'تحميل أنواع العقود');
+  const body = (await res.json()) as { items?: DraftTypeSpec[] };
+  return Array.isArray(body.items) ? body.items : [];
+}
+
+/** POST /api/drafting/generate — المسودة ونتيجة فحص الجودة. 400 بأخطاء الحقول → DraftFieldError. */
+export async function generateDraft(payload: DraftRequest): Promise<DraftResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/drafting/generate`, {
+      method: 'POST',
+      headers: draftHeaders(),
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await draftFailure(res, 'إعداد المسودة');
+  return (await res.json()) as DraftResult;
+}
+
+/** POST /api/drafting/export?format=pdf|docx — يعيد توليد المسودة من الإجابات نفسها ويطلق تنزيل الملف. */
+export async function downloadDraft(payload: DraftRequest, format: 'pdf' | 'docx'): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/drafting/export?format=${format}`, {
+      method: 'POST',
+      headers: draftHeaders(),
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) {
+    const err = await draftFailure(res, 'تنزيل المسودة');
+    if (res.status === 503 && format === 'pdf') throw new ApiError(503, 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.');
+    throw err;
+  }
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? `contract-draft.${format}`;
   const url = URL.createObjectURL(blob);
   try {
     const link = document.createElement('a');

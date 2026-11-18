@@ -6,7 +6,7 @@ import { ContractDraftingScreen } from '@/components/contract-drafting/ContractD
 
 export const metadata: Metadata = {
   title: 'صياغة العقود — منصة قانونية عربية',
-  description: 'خدمة صياغة العقود ضمن «العقود القانونية» — قيد الإعداد حالياً.',
+  description: 'صياغة عقد خدمات أو إيجار أو اتفاقية سرية من قوالب محكَّمة وإجاباتك، مع فحص جودة آلى وتنزيل Word/PDF — مسودة تحتاج مراجعة محامٍ.',
 };
 
 export default function ContractDraftingPage() {
