@@ -900,6 +900,21 @@ export interface TranslationJob {
   notes: TranslationNote[];
   expires_at: string;
   created_at: string;
+  /** running = الخادم يكمل الترجمة بنفسه الآن؛ idle = لا مشغِّل. غيابه = خادم قديم (العميل يقود الخطوات). */
+  background?: 'running' | 'idle';
+}
+
+/** عنصر «ترجماتى»: بيانات وصفية بلا نص العقد */
+export interface TranslationListItem {
+  id: string;
+  status: TranslationStatus;
+  source_lang: TranslationLang;
+  target_lang: TranslationLang;
+  title: string;
+  progress: TranslationProgress;
+  background: 'running' | 'idle';
+  expires_at: string;
+  created_at: string;
 }
 
 export interface TranslationUnit {

@@ -50,6 +50,11 @@ export interface DraftQualityFinding {
   detail: string;
 }
 
+/** ملاحظة من قواعد المكتب: موقف تعاقدى للمكتب يختلف عن القالب (ليست عيباً ولا تُسقط فحص الجودة) */
+export interface DraftOfficeNote extends DraftQualityFinding {
+  suggestion: string;
+}
+
 export interface DraftResult {
   typeId: string;
   assisted?: boolean;
@@ -61,7 +66,7 @@ export interface DraftResult {
   clauses: DraftClause[];
   closing: string[];
   lawyerNotes: string[];
-  quality: { passed: boolean; checked: string[]; findings: DraftQualityFinding[] };
+  quality: { passed: boolean; checked: string[]; findings: DraftQualityFinding[]; officeNotes?: DraftOfficeNote[] };
   fullText: string;
 }
 
@@ -130,7 +135,7 @@ export function missingRequired(spec: DraftTypeSpec, answers: DraftAnswers): Rec
 
 const SEVERITY_ORDER = ['حرج', 'عالٍ', 'متوسط', 'منخفض'];
 
-export function sortFindings(findings: DraftQualityFinding[]): DraftQualityFinding[] {
+export function sortFindings<T extends { severity: string }>(findings: T[]): T[] {
   return [...findings].sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
 }
 

@@ -16,6 +16,8 @@ jest.mock('@/lib/api-client', () => {
     editTranslationUnit: jest.fn(),
     deleteTranslation: jest.fn(),
     downloadTranslation: jest.fn(),
+    fetchMyTranslations: jest.fn(),
+    runTranslationInBackground: jest.fn(),
   };
 });
 
@@ -25,8 +27,10 @@ import {
   deleteTranslation,
   downloadTranslation,
   editTranslationUnit,
+  fetchMyTranslations,
   fetchTranslation,
   fetchTranslationUnits,
+  runTranslationInBackground,
   stepTranslation,
 } from '@/lib/api-client';
 
@@ -37,6 +41,8 @@ const mUnits = fetchTranslationUnits as jest.MockedFunction<typeof fetchTranslat
 const mEdit = editTranslationUnit as jest.MockedFunction<typeof editTranslationUnit>;
 const mDelete = deleteTranslation as jest.MockedFunction<typeof deleteTranslation>;
 const mDownload = downloadTranslation as jest.MockedFunction<typeof downloadTranslation>;
+const mMine = fetchMyTranslations as jest.MockedFunction<typeof fetchMyTranslations>;
+const mRun = runTranslationInBackground as jest.MockedFunction<typeof runTranslationInBackground>;
 
 const SESSION = {
   access_token: 'a',
@@ -80,7 +86,10 @@ async function startFlow(user: ReturnType<typeof userEvent.setup>) {
 
 describe('TranslationScreen', () => {
   beforeEach(() => {
-    [mCreate, mStep, mFetch, mUnits, mEdit, mDelete, mDownload].forEach((m) => m.mockReset());
+    [mCreate, mStep, mFetch, mUnits, mEdit, mDelete, mDownload, mMine, mRun].forEach((m) => m.mockReset());
+    mMine.mockResolvedValue([]);
+    // الافتراضى: لا مشغِّل خلفية متاح => تقود الواجهة الخطوات كما كان (يُجرَّب الاستئناف أولاً ثم يسقط للخطوات)
+    mRun.mockRejectedValue(new ApiError(429, 'ممتلئ'));
     clearAuthSession();
     window.sessionStorage.clear();
   });
@@ -120,7 +129,7 @@ describe('TranslationScreen', () => {
     render(<TranslationScreen />);
     await startFlow(user);
 
-    expect(mCreate).toHaveBeenCalledWith(DOCX, 'en', true);
+    expect(mCreate).toHaveBeenCalledWith(DOCX, 'en', true, true);
     expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
     expect(mStep).toHaveBeenCalledTimes(2);
     expect(window.sessionStorage.getItem(ACTIVE_TRANSLATION_KEY)).toBe('t-1');
@@ -144,7 +153,7 @@ describe('TranslationScreen', () => {
     render(<TranslationScreen />);
     await user.selectOptions(await screen.findByLabelText('الترجمة إلى'), 'ar');
     await startFlow(user);
-    expect(mCreate).toHaveBeenCalledWith(DOCX, 'ar', true);
+    expect(mCreate).toHaveBeenCalledWith(DOCX, 'ar', true, true);
   });
 
   it('خطأ الإنشاء (422) يُعرض ويبقى النموذج', async () => {
@@ -255,5 +264,118 @@ describe('TranslationScreen', () => {
     expect(mUnits).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'عرض المعاينة' }));
     expect(await screen.findByText('Employment Contract')).toBeInTheDocument();
+  });
+
+  describe('تشغيل الخلفية (الخادم يكمل الترجمة)', () => {
+    const RUNNING = (done: number) =>
+      job({ status: 'translating', background: 'running', progress: { done_units: done, total_units: 10, done_batches: 1, total_batches: 2 } });
+
+    it('الخادم يكمل: الواجهة تتابع بالجلب فقط ولا تستدعى step أبداً', async () => {
+      setAuthSession(SESSION);
+      const user = userEvent.setup();
+      mCreate.mockResolvedValue(job({ background: 'running' }));
+      mFetch.mockResolvedValueOnce(RUNNING(5)).mockResolvedValueOnce({ ...DONE, background: 'idle' });
+      render(<TranslationScreen pollMs={5} />);
+      await startFlow(user);
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(mStep).not.toHaveBeenCalled();
+      expect(mFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('أثناء الجريان يخبر المستخدم أنه يستطيع إغلاق الصفحة والعودة من «ترجماتى»', async () => {
+      setAuthSession(SESSION);
+      const user = userEvent.setup();
+      mCreate.mockResolvedValue(job({ background: 'running' }));
+      mFetch.mockResolvedValue(RUNNING(5));
+      render(<TranslationScreen pollMs={5} />);
+      await startFlow(user);
+      expect(await screen.findByText(/يمكنك إغلاق هذه الصفحة والعودة لاحقاً/)).toBeInTheDocument();
+    });
+
+    it('توقف المشغِّل قبل الاكتمال: «أعد المحاولة»، والضغط يطلب الخلفية من جديد ثم يكمل', async () => {
+      setAuthSession(SESSION);
+      const user = userEvent.setup();
+      mCreate.mockResolvedValue(job({ background: 'running' }));
+      mFetch
+        .mockResolvedValueOnce(job({ status: 'translating', background: 'idle', progress: { done_units: 5, total_units: 10, done_batches: 1, total_batches: 2 } }))
+        .mockResolvedValueOnce({ ...DONE, background: 'idle' });
+      mRun.mockReset();
+      mRun.mockResolvedValue(RUNNING(5));
+      render(<TranslationScreen pollMs={5} />);
+      await startFlow(user);
+      expect(await screen.findByRole('alert')).toHaveTextContent('توقفت الترجمة فى الخلفية');
+      await user.click(screen.getByRole('button', { name: /أعد المحاولة/ }));
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(mRun).toHaveBeenCalledWith('t-1');
+      expect(mStep).not.toHaveBeenCalled();
+    });
+
+    it('طابور الخلفية ممتلئ (429) عند الاستئناف: تكمل الواجهة الخطوات بنفسها', async () => {
+      setAuthSession(SESSION);
+      window.sessionStorage.setItem(ACTIVE_TRANSLATION_KEY, 't-1');
+      mFetch.mockResolvedValue(job({ status: 'translating', background: 'idle', progress: { done_units: 5, total_units: 10, done_batches: 1, total_batches: 2 } }));
+      mStep.mockResolvedValue(DONE);
+      const user = userEvent.setup();
+      render(<TranslationScreen pollMs={5} />);
+      await user.click(await screen.findByRole('button', { name: /تابع الترجمة/ }));
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(mRun).toHaveBeenCalledWith('t-1');
+      expect(mStep).toHaveBeenCalledTimes(1);
+    });
+
+    it('خادم قديم (بلا حقل background): السلوك القديم، الواجهة تقود الخطوات', async () => {
+      setAuthSession(SESSION);
+      const user = userEvent.setup();
+      mCreate.mockResolvedValue(job());
+      mStep.mockResolvedValueOnce(DONE);
+      render(<TranslationScreen pollMs={5} />);
+      await startFlow(user);
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(mStep).toHaveBeenCalledTimes(1);
+      expect(mFetch).not.toHaveBeenCalled();
+    });
+
+    it('مهمة محفوظة ما زال الخادم يترجمها: تُتابَع تلقائياً بلا ضغط زر وبلا خطوات', async () => {
+      setAuthSession(SESSION);
+      window.sessionStorage.setItem(ACTIVE_TRANSLATION_KEY, 't-1');
+      mFetch.mockResolvedValueOnce(RUNNING(5)).mockResolvedValueOnce(RUNNING(8)).mockResolvedValue({ ...DONE, background: 'idle' });
+      render(<TranslationScreen pollMs={5} />);
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(mStep).not.toHaveBeenCalled();
+    });
+
+    it('«ترجماتى»: تظهر الجارية بعد إغلاق التبويب ويفتحها المستخدم فتُتابَع', async () => {
+      setAuthSession(SESSION);
+      const user = userEvent.setup();
+      mMine.mockResolvedValue([
+        {
+          id: 't-9',
+          status: 'translating',
+          source_lang: 'ar',
+          target_lang: 'en',
+          title: 'عقد الإيجار',
+          progress: { done_units: 3, total_units: 10, done_batches: 1, total_batches: 3 },
+          background: 'running',
+          expires_at: '2026-10-17T10:00:00.000Z',
+          created_at: '2026-10-15T10:00:00.000Z',
+        },
+      ]);
+      mFetch.mockResolvedValueOnce(job({ id: 't-9', status: 'translating', background: 'running' })).mockResolvedValue({ ...DONE, id: 't-9' });
+      render(<TranslationScreen pollMs={5} />);
+      const list = await screen.findByLabelText('ترجماتى');
+      expect(within(list).getByText(/عقد الإيجار/)).toBeInTheDocument();
+      expect(within(list).getByText(/جارية على الخادم \(3\/10\)/)).toBeInTheDocument();
+      await user.click(within(list).getByRole('button', { name: 'افتح' }));
+      expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+      expect(window.sessionStorage.getItem(ACTIVE_TRANSLATION_KEY)).toBe('t-9');
+    });
+
+    it('فشل جلب «ترجماتى» لا يكسر الصفحة', async () => {
+      setAuthSession(SESSION);
+      mMine.mockRejectedValue(new ApiError(500, 'x'));
+      render(<TranslationScreen />);
+      expect(await screen.findByLabelText(/ملف العقد/)).toBeInTheDocument();
+      expect(screen.queryByLabelText('ترجماتى')).not.toBeInTheDocument();
+    });
   });
 });

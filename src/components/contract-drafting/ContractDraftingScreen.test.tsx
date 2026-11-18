@@ -233,6 +233,47 @@ describe('ContractDraftingScreen', () => {
     expect(items[1]).toHaveTextContent('[منخفض] ملاحظة بسيطة');
   });
 
+  it('ملاحظات قواعد المكتب تُعرض منفصلة وبنص مقترح، ولا تغيّر نتيجة فحص الجودة', async () => {
+    setAuthSession(SESSION);
+    mockedGenerate.mockResolvedValueOnce({
+      ...RESULT,
+      quality: {
+        passed: true,
+        checked: ['x'],
+        findings: [],
+        officeNotes: [
+          { severity: 'منخفض', title: 'اقتراح بسيط', detail: 'د1', suggestion: 'نص مقترح بسيط' },
+          { severity: 'عالٍ', title: 'موقف مهم للمكتب', detail: 'د2', suggestion: 'نص مقترح مهم' },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    render(<ContractDraftingScreen />);
+    await pickType(user, /اتفاقية سرية/);
+    await fillMinimum(user);
+    await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+    // فحص الجودة نفسه ناجح
+    expect(await screen.findByRole('status')).toHaveTextContent('اجتازت المسودة فحص الجودة الآلى بلا ملاحظات');
+    const notes = screen.getByLabelText('ملاحظات قواعد المكتب');
+    expect(notes).toHaveTextContent('ليست عيوباً فى المسودة');
+    const items = notes.querySelectorAll('li');
+    expect(items[0]).toHaveTextContent('[عالٍ] موقف مهم للمكتب');
+    expect(items[0]).toHaveTextContent('نص مقترح للنظر: نص مقترح مهم');
+    expect(items[1]).toHaveTextContent('[منخفض] اقتراح بسيط');
+  });
+
+  it('بلا ملاحظات مكتب (خادم قديم أو مصفوفة فارغة): لا قسم', async () => {
+    setAuthSession(SESSION);
+    mockedGenerate.mockResolvedValueOnce({ ...RESULT, quality: { passed: true, checked: [], findings: [], officeNotes: [] } });
+    const user = userEvent.setup();
+    render(<ContractDraftingScreen />);
+    await pickType(user, /اتفاقية سرية/);
+    await fillMinimum(user);
+    await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+    await screen.findByRole('heading', { name: 'اتفاقية سرية وعدم إفصاح' });
+    expect(screen.queryByLabelText('ملاحظات قواعد المكتب')).not.toBeInTheDocument();
+  });
+
   it('أخطاء الحقول من الخادم تظهر تحت الحقل نفسه ويبقى النموذج', async () => {
     setAuthSession(SESSION);
     mockedGenerate.mockRejectedValueOnce(new DraftFieldError('بعض الإجابات تحتاج تصحيحاً', { start_date: 'تاريخ غير صالح' }));

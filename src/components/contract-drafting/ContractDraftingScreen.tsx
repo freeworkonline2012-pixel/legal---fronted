@@ -420,6 +420,29 @@ export function ContractDraftingScreen() {
                 </div>
               </div>
 
+              {(shown.quality.officeNotes?.length ?? 0) > 0 ? (
+                <section
+                  aria-label="ملاحظات قواعد المكتب"
+                  className="space-y-2 rounded-lg border border-border-default bg-surface-muted p-4 text-body-sm text-text-primary"
+                >
+                  <p className="font-semibold">ملاحظات قواعد المكتب ({shown.quality.officeNotes?.length})</p>
+                  <p className="text-text-secondary">
+                    مواضع تختلف فيها المسودة عن ممارسة المكتب. ليست عيوباً فى المسودة ولا تؤثر فى نتيجة الفحص؛ يقرر محاميك إدراجها أو تركها، والنص المقترح للاسترشاد فقط ولا يُدرج تلقائياً.
+                  </p>
+                  <ul className="list-disc space-y-2 ps-5">
+                    {sortFindings(shown.quality.officeNotes ?? []).map((n, i) => (
+                      <li key={i}>
+                        <strong>
+                          [{n.severity}] {n.title}
+                        </strong>{' '}
+                        — {n.detail}
+                        {n.suggestion ? <span className="mt-1 block text-text-secondary">نص مقترح للنظر: {n.suggestion}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
               <article aria-label="نص العقد" className="space-y-4 rounded-lg border border-border-default bg-surface p-5 text-body leading-8 text-text-primary">
                 {shown.preamble.map((p, i) => (
                   <p key={`pre-${i}`}>{p}</p>

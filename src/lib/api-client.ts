@@ -40,6 +40,7 @@ import type {
   ReviewListResponse,
   ReviewStatus,
   TranslationJob,
+  TranslationListItem,
   TranslationLang,
   TranslationLayout,
   TranslationUnit,
@@ -814,10 +815,17 @@ async function translationFetch(path: string, init: RequestInit, fallback: strin
  * POST /api/translations — يرفع العقد ويفحص لغته ويجهّز المهمة (لا ترجمة بعد). الموافقة الصريحة شرط يفرضه الخادم.
  * 422: لغة الهدف = لغة العقد / عقد ثنائى اللغة / نص غير مقروء (الرسالة من الخادم).
  */
-export async function createTranslation(file: File, targetLang: TranslationLang, consent: boolean): Promise<TranslationJob> {
+export async function createTranslation(
+  file: File,
+  targetLang: TranslationLang,
+  consent: boolean,
+  background = false,
+): Promise<TranslationJob> {
   const form = new FormData();
   form.append('target_lang', targetLang);
   form.append('consent', consent ? 'true' : 'false');
+  // اختيارى: يكمل الخادم الترجمة بنفسه (خادم قديم يتجاهل الحقل فيقود العميل الخطوات)
+  if (background) form.append('background', 'true');
   form.append('file', file);
   // لا نضع Content-Type: المتصفح يضبط حدود multipart بنفسه.
   const res = await translationFetch('', { method: 'POST', body: form }, 'تعذّر بدء الترجمة');
@@ -828,6 +836,18 @@ export async function createTranslation(file: File, targetLang: TranslationLang,
 export async function stepTranslation(id: string): Promise<TranslationJob> {
   const res = await translationFetch(`/${encodeURIComponent(id)}/step`, { method: 'POST' }, 'تعذّرت خطوة الترجمة');
   return (await res.json()) as TranslationJob;
+}
+
+/** POST /api/translations/{id}/run — يطلب من الخادم إكمال الترجمة فى الخلفية. 429 = طابور الخلفية ممتلئ. */
+export async function runTranslationInBackground(id: string): Promise<TranslationJob> {
+  const res = await translationFetch(`/${encodeURIComponent(id)}/run`, { method: 'POST' }, 'تعذّر تشغيل الترجمة فى الخلفية');
+  return (await res.json()) as TranslationJob;
+}
+
+/** GET /api/translations — ترجماتى الحية (بيانات وصفية فقط) للعودة إلى ترجمة جارية بعد إغلاق الصفحة. */
+export async function fetchMyTranslations(): Promise<TranslationListItem[]> {
+  const res = await translationFetch('', {}, 'تعذّر جلب ترجماتك');
+  return (await res.json()) as TranslationListItem[];
 }
 
 export async function fetchTranslation(id: string): Promise<TranslationJob> {

@@ -2,7 +2,8 @@
  * TranslationScreen — «الترجمة القانونية للعقود» (عربى <-> إنجليزى).
  *
  * التدفق (يوازى «مراجعة العقود»): رفع العقد + اختيار لغة الترجمة + موافقة صريحة ← الخادم يقرأ الملف ويكشف لغته
- * بدقة ويجهّز المهمة ← ترجمة على خطوات متتابعة يقودها هذا المكوّن (كل خطوة دفعة فقرات؛ تستمر بعد تحديث الصفحة)
+ * بدقة ويجهّز المهمة ← ترجمة يكملها الخادم نفسه فى الخلفية (هذا المكوّن يتابع التقدم فقط ويمكن إغلاق الصفحة والعودة من «ترجماتى»)؛
+ * وإن كان الخادم قديماً أو امتلأ طابور الخلفية يقود هذا المكوّن الخطوات بنفسه (كل خطوة دفعة فقرات؛ تستمر بعد تحديث الصفحة)
  * ← معاينة الفقرات + البنود الموسومة للمراجعة + ملاحظات المترجم ← تنزيل Word/PDF (ترجمة فقط أو ثنائى اللغة).
  *
  * لا منطق قانونى هنا: كشف اللغة والفحوص (أرقام/طول/نص غير مترجم) والقاموس كلها فى الخادم.
@@ -14,15 +15,17 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileDown, Languages, Loader2, LogIn, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
-import type { TranslationJob, TranslationLang, TranslationLayout, TranslationUnit } from '@/lib/types';
+import type { TranslationJob, TranslationLang, TranslationLayout, TranslationListItem, TranslationUnit } from '@/lib/types';
 import {
   ApiError,
   createTranslation,
   deleteTranslation,
   downloadTranslation,
   editTranslationUnit,
+  fetchMyTranslations,
   fetchTranslation,
   fetchTranslationUnits,
+  runTranslationInBackground,
   stepTranslation,
 } from '@/lib/api-client';
 import type { ExportFormat } from '@/lib/api-client';
@@ -46,6 +49,8 @@ type Phase = 'form' | 'creating' | 'running' | 'paused' | 'done';
 const PAGE_SIZE = 25;
 const CONFLICT_WAIT_MS = 4000;
 const MAX_CONFLICT_RETRIES = 8;
+const DEFAULT_POLL_MS = 3000;
+const MAX_POLL_FAILURES = 5;
 
 const SELECT_CLASSES =
   'h-11 w-full rounded-md border border-border-default bg-surface px-3 text-body-sm text-text-primary focus:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)]';
@@ -75,7 +80,7 @@ function messageOf(err: unknown): string {
   return err instanceof ApiError ? err.message : 'حدث خطأ غير متوقّع — حاول مرة أخرى.';
 }
 
-export function TranslationScreen() {
+export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: number } = {}) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<Phase>('form');
   const [job, setJob] = useState<TranslationJob | null>(null);
@@ -84,6 +89,7 @@ export function TranslationScreen() {
   const [target, setTarget] = useState<TranslationLang>('en');
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mine, setMine] = useState<TranslationListItem[]>([]);
 
   const aliveRef = useRef(true);
   const runningRef = useRef(false);
@@ -139,6 +145,54 @@ export function TranslationScreen() {
     }
   }, []);
 
+  /** الخادم يكمل الترجمة: نتابع التقدم فقط (لا نستدعى step). توقف المشغِّل قبل الاكتمال = نعرض «تابع» ليستأنفه المستخدم. */
+  const followBackground = useCallback(
+    async (start: TranslationJob) => {
+      if (runningRef.current) return;
+      runningRef.current = true;
+      setPhase('running');
+      setError(null);
+      let current = start;
+      let failures = 0;
+      try {
+        while (aliveRef.current && current.status !== 'completed') {
+          await sleep(pollMs);
+          if (!aliveRef.current) return;
+          try {
+            current = await fetchTranslation(current.id);
+            failures = 0;
+            setJob(current);
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 404) throw err;
+            failures += 1;
+            if (failures >= MAX_POLL_FAILURES) throw err;
+            continue;
+          }
+          if (current.status !== 'completed' && current.background !== 'running') {
+            setPhase('paused');
+            setError('توقفت الترجمة فى الخلفية قبل اكتمالها — اضغط «أعد المحاولة» لإكمالها (ما أُنجز محفوظ).');
+            return;
+          }
+        }
+        if (aliveRef.current && current.status === 'completed') setPhase('done');
+      } catch (err) {
+        if (aliveRef.current) {
+          if (err instanceof ApiError && err.status === 404) {
+            rememberActive(null);
+            setJob(null);
+            setPhase('form');
+          } else {
+            setPhase('paused');
+          }
+          setError(messageOf(err));
+        }
+      } finally {
+        runningRef.current = false;
+      }
+    },
+    [pollMs],
+  );
+
   useEffect(() => {
     // متعمّد: sessionStorage متاح للعميل فقط؛ القراءة أثناء hydration تكسر تطابق SSR
     // (نفس نمط ContractsScreen/ExportButtons).
@@ -146,16 +200,29 @@ export function TranslationScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthed(ok);
     if (!ok) return;
+    // ترجماتى: للعودة إلى ترجمة بدأت فى الخلفية بعد إغلاق التبويب (المعرّف المحفوظ فى الجلسة يضيع معه)
+    fetchMyTranslations()
+      .then((items) => {
+        if (aliveRef.current) setMine(items);
+      })
+      .catch(() => undefined);
     const saved = recallActive();
     if (!saved) return;
     fetchTranslation(saved)
       .then((existing) => {
         if (!aliveRef.current) return;
         setJob(existing);
-        setPhase(existing.status === 'completed' ? 'done' : 'paused');
+        if (existing.status === 'completed') {
+          setPhase('done');
+        } else if (existing.background === 'running') {
+          // الخادم ما زال يترجمها: نتابع تلقائياً (لا خطوات من هنا)
+          void followBackground(existing);
+        } else {
+          setPhase('paused');
+        }
       })
       .catch(() => rememberActive(null));
-  }, []);
+  }, [followBackground]);
 
   function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
@@ -175,13 +242,58 @@ export function TranslationScreen() {
     setPhase('creating');
     setError(null);
     try {
-      const created = await createTranslation(file, target, true);
+      const created = await createTranslation(file, target, true, true);
       rememberActive(created.id);
       setJob(created);
-      void runSteps(created);
+      // خادم جديد: يكمل بنفسه ونتابع. خادم قديم (بلا حقل background) أو طابور ممتلئ: نقود الخطوات كما كان.
+      if (created.background === 'running') void followBackground(created);
+      else void runSteps(created);
     } catch (err) {
       setError(messageOf(err));
       setPhase('form');
+    }
+  }
+
+  /** استئناف: نطلب أولاً من الخادم إكمالها فى الخلفية، وإن تعذّر لأى سبب نقود الخطوات من هنا. */
+  async function handleResume(current: TranslationJob) {
+    setError(null);
+    try {
+      const started = await runTranslationInBackground(current.id);
+      if (started.status === 'completed') {
+        setJob(started);
+        setPhase('done');
+        return;
+      }
+      if (started.background === 'running') {
+        setJob(started);
+        void followBackground(started);
+        return;
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        rememberActive(null);
+        setJob(null);
+        setPhase('form');
+        setError(messageOf(err));
+        return;
+      }
+      // 429 (طابور الخلفية ممتلئ) أو أى فشل آخر: نكمل من المتصفح
+    }
+    void runSteps(current);
+  }
+
+  async function handleOpenMine(item: TranslationListItem) {
+    setError(null);
+    try {
+      const existing = await fetchTranslation(item.id);
+      rememberActive(existing.id);
+      setJob(existing);
+      if (existing.status === 'completed') setPhase('done');
+      else if (existing.background === 'running') void followBackground(existing);
+      else setPhase('paused');
+    } catch (err) {
+      setError(messageOf(err));
+      setMine((prev) => prev.filter((m) => m.id !== item.id));
     }
   }
 
@@ -229,6 +341,29 @@ export function TranslationScreen() {
           </div>
           <ButtonLink href="/login">تسجيل الدخول</ButtonLink>
         </div>
+      ) : null}
+
+      {authed === true && phase === 'form' && mine.length > 0 ? (
+        <section aria-label="ترجماتى" className="mb-5 space-y-2 rounded-lg border border-border-default bg-surface p-4 sm:p-5">
+          <h2 className="text-body font-semibold text-text-primary">ترجماتى (تُحذف تلقائياً بعد انتهاء مدتها)</h2>
+          <ul className="space-y-2">
+            {mine.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-2 text-body-sm">
+                <span className="text-text-primary">
+                  {m.title} — {directionLabel(m.source_lang, m.target_lang)} —{' '}
+                  {m.status === 'completed'
+                    ? 'مكتملة'
+                    : m.background === 'running'
+                      ? `جارية على الخادم (${m.progress.done_units}/${m.progress.total_units})`
+                      : `متوقفة (${m.progress.done_units}/${m.progress.total_units})`}
+                </span>
+                <Button type="button" variant="ghost" onClick={() => void handleOpenMine(m)}>
+                  افتح
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {authed === true && (phase === 'form' || phase === 'creating') ? (
@@ -335,7 +470,9 @@ export function TranslationScreen() {
               <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${progressPercent(job)}%` }} />
             </div>
             <p className="mt-2 text-caption text-text-tertiary">
-              اترك هذه الصفحة مفتوحة حتى تكتمل الترجمة. إن أُغلقت فما أُنجز محفوظ وتكمل من حيث توقفت.
+              {job.background === 'running'
+                ? 'الترجمة تجرى على الخادم: يمكنك إغلاق هذه الصفحة والعودة لاحقاً، وستجدها فى «ترجماتى» بنفس الصفحة (تُحذف تلقائياً بعد 48 ساعة).'
+                : 'اترك هذه الصفحة مفتوحة حتى تكتمل الترجمة. إن أُغلقت فما أُنجز محفوظ وتكمل من حيث توقفت.'}
             </p>
           </div>
 
@@ -348,7 +485,7 @@ export function TranslationScreen() {
 
           <div className="flex flex-wrap gap-3">
             {phase === 'paused' ? (
-              <Button type="button" onClick={() => void runSteps(job)}>
+              <Button type="button" onClick={() => void handleResume(job)}>
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
                 {error ? 'أعد المحاولة' : 'تابع الترجمة'}
               </Button>
