@@ -762,7 +762,42 @@ export interface ContractResponse {
   clauses?: ContractClauseItem[];
   /** تقدم التحليل أثناء المعالجة (status=processing): المرحلة بنص عربى جاهز ونسبتها؛ null بعد الانتهاء */
   processing?: { stage: string; label: string; done: number; total: number } | null;
+  /** true = تفاصيل المراجعة (التفسير والمواد والصياغات وشرح الملاحظات) مخفية حتى السداد المؤكَّد؛ الحالة والعناوين ظاهرة */
+  details_locked?: boolean;
   created_at: string;
+}
+
+/** مرحلة طلب مراجعة العقد: نسخة أولية ← موافقة ← إعلان سداد ← سداد مؤكَّد */
+export type ContractOrderStage = 'preview' | 'approved' | 'payment_submitted' | 'paid';
+
+/** GET /exports/contracts/{id}/order */
+export interface ContractOrder {
+  contract_id: string;
+  stage: ContractOrderStage;
+  /** المالك/admin: بلا مقابل ولا مراحل */
+  free_access: boolean;
+  processed: boolean;
+  /** بالجنيه؛ null = لم يُضبط سعر الخدمة */
+  fee_amount: number | null;
+  fee_currency: 'EGP';
+  payment_instructions: string | null;
+  payment_reference: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  can_download_preliminary: boolean;
+  can_download_final: boolean;
+  awaiting_human_review: boolean;
+  details_locked: boolean;
+}
+
+/** GET /exports/contracts/orders/pending (admin) */
+export interface PendingPayment {
+  contract_id: string;
+  original_filename: string;
+  fee_amount: number | null;
+  fee_currency: 'EGP';
+  payment_reference: string | null;
+  submitted_at: string | null;
 }
 
 /* ------------------------------------------------------------------------ */

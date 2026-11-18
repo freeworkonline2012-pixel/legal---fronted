@@ -10,6 +10,7 @@ jest.mock('@/lib/api-client', () => {
   return {
     ...actual,
     uploadContract: jest.fn(),
+    fetchContractOrder: jest.fn().mockReturnValue(new Promise(() => {})), // لوحة الطلب خارج نطاق هذا الملف
   };
 });
 
@@ -97,6 +98,42 @@ describe('ContractsScreen', () => {
     expect(screen.queryByLabelText('ملف العقد')).not.toBeInTheDocument();
   });
 
+  it('العميل: الرفع Word فقط وزر الرفع معطّل حتى يُقرّ بخلوّ الملف من البيانات الشخصية', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup();
+    render(<ContractsScreen />);
+    await skipPositionStep(user);
+    const input = await screen.findByLabelText('ملف العقد');
+    expect(input).toHaveAttribute('accept', expect.not.stringContaining('.pdf'));
+    expect(screen.getByText(/ملف Word \(DOCX\) فقط/)).toBeInTheDocument();
+    await user.upload(input, makeFile('test-contract.docx'));
+    expect(screen.getByRole('button', { name: /رفع وتحليل العقد/ })).toBeDisabled();
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
+    expect(screen.getByRole('button', { name: /رفع وتحليل العقد/ })).toBeEnabled();
+  });
+
+  it('العميل: ملف PDF يُرفض قبل استدعاء الخادم برسالة Word فقط', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup({ applyAccept: false });
+    render(<ContractsScreen />);
+    await skipPositionStep(user);
+    await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('c.pdf', 1024, 'application/pdf'));
+    expect(await screen.findByText(/المسموح رفع ملف Word \(DOCX\) فقط/)).toBeInTheDocument();
+    expect(mockedUpload).not.toHaveBeenCalled();
+  });
+
+  it('المالك (admin): يرفع PDF بلا إقرار', async () => {
+    setAuthSession({ ...SESSION, user: { ...SESSION.user, role: 'admin' } });
+    mockedUpload.mockResolvedValue(PROCESSED_RESPONSE);
+    const user = userEvent.setup();
+    render(<ContractsScreen />);
+    await skipPositionStep(user);
+    expect(screen.queryByLabelText(/أقرّ بأن الملف/)).not.toBeInTheDocument();
+    await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('c.pdf', 1024, 'application/pdf'));
+    await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
+    await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
+  });
+
   it('يعرض نموذج الرفع دون جملة التعريف أو التنبيه الأعلى عند وجود جلسة', async () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
@@ -118,7 +155,7 @@ describe('ContractsScreen', () => {
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('contract.txt', 1024, 'text/plain'));
 
-    expect(await screen.findByText(/نوع ملف غير مدعوم/)).toBeInTheDocument();
+    expect(await screen.findByText(/المسموح رفع ملف Word \(DOCX\) فقط/)).toBeInTheDocument();
     expect(mockedUpload).not.toHaveBeenCalled();
   });
 
@@ -143,6 +180,7 @@ describe('ContractsScreen', () => {
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     await waitFor(() => {
@@ -162,7 +200,8 @@ describe('ContractsScreen', () => {
     await skipPositionStep(user);
 
     const input = await screen.findByLabelText('ملف العقد');
-    await user.upload(input, makeFile('scanned.pdf', 1024, 'application/pdf'));
+    await user.upload(input, makeFile('scanned.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     await waitFor(() => {
@@ -180,6 +219,7 @@ describe('ContractsScreen', () => {
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     expect(await screen.findByText(/انتهت صلاحية جلستك/)).toBeInTheDocument();
@@ -194,6 +234,7 @@ describe('ContractsScreen', () => {
 
     const input = await screen.findByLabelText('ملف العقد');
     await user.upload(input, makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     await waitFor(() => {
@@ -229,6 +270,7 @@ describe('ContractsScreen', () => {
 
     expect(await screen.findByTestId('position-banner')).toHaveTextContent('المستأجر — عقد إيجار (الطرف الثانى فى نص العقد)');
     await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
 
     await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
@@ -248,6 +290,7 @@ describe('ContractsScreen', () => {
     await user.click(screen.getByRole('button', { name: 'إرسال الإجابات' }));
     expect(await screen.findByTestId('party-missing')).toHaveTextContent('لن تتوفر الصياغة المقترحة');
     await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
     await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
     expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: 'عقد إيجار', client_role: 'المستأجر', client_party: null });
@@ -261,6 +304,7 @@ describe('ContractsScreen', () => {
     await skipPositionStep(user);
     expect(await screen.findByTestId('position-banner')).toHaveTextContent('تدقيق محايد');
     await user.upload(await screen.findByLabelText('ملف العقد'), makeFile('test-contract.docx'));
+    await user.click(screen.getByLabelText(/أقرّ بأن الملف/));
     await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
     await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
     expect(mockedUpload.mock.calls[0][1]).toEqual({ contract_type: null, client_role: null, client_party: null });

@@ -6,12 +6,20 @@ import type { ContractResponse } from '@/lib/types';
 
 jest.mock('@/lib/api-client', () => {
   const actual = jest.requireActual('@/lib/api-client');
-  return { ...actual, uploadContract: jest.fn(), approveContractReport: jest.fn() };
+  return {
+    ...actual,
+    uploadContract: jest.fn(),
+    approveContractReport: jest.fn(),
+    fetchContractOrder: jest.fn(),
+    fetchPendingPayments: jest.fn().mockResolvedValue([]),
+  };
 });
 
-import { approveContractReport, uploadContract } from '@/lib/api-client';
+import { approveContractReport, fetchContractOrder, uploadContract } from '@/lib/api-client';
+import type { ContractOrder } from '@/lib/types';
 
 const mockedUpload = uploadContract as jest.MockedFunction<typeof uploadContract>;
+const mockedOrder = fetchContractOrder as jest.MockedFunction<typeof fetchContractOrder>;
 const mockedApprove = approveContractReport as jest.MockedFunction<typeof approveContractReport>;
 
 const PROCESSED: ContractResponse = {
@@ -33,6 +41,23 @@ const FAILED: ContractResponse = {
   created_at: '2026-10-15T10:00:00.000Z',
 };
 
+const PREVIEW_ORDER: ContractOrder = {
+  contract_id: 'contract-1',
+  stage: 'preview',
+  free_access: false,
+  processed: true,
+  fee_amount: 250,
+  fee_currency: 'EGP',
+  payment_instructions: null,
+  payment_reference: null,
+  approved_at: null,
+  paid_at: null,
+  can_download_preliminary: true,
+  can_download_final: false,
+  awaiting_human_review: false,
+  details_locked: true,
+};
+
 function session(role: 'user' | 'admin') {
   return {
     access_token: 'a',
@@ -50,6 +75,8 @@ async function upload(response: ContractResponse) {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   });
   await user.upload(await screen.findByLabelText('ملف العقد'), file);
+  const declaration = screen.queryByLabelText(/أقرّ بأن الملف/);
+  if (declaration) await user.click(declaration); // العميل فقط؛ المالك بلا إقرار
   await user.click(screen.getByRole('button', { name: /رفع وتحليل العقد/ }));
   await waitFor(() => expect(mockedUpload).toHaveBeenCalled());
   return user;
@@ -59,22 +86,27 @@ describe('ContractsScreen — تنزيل التقرير واعتماده', () =>
   beforeEach(() => {
     mockedUpload.mockReset();
     mockedApprove.mockReset();
+    mockedOrder.mockReset();
     clearAuthSession();
   });
 
-  it('العميل العادى يرى تنزيل التقرير ولا يرى زر الاعتماد', async () => {
+  it('العميل: يرى لوحة الطلب (نسخة أولية) لا أزرار التنزيل النهائى ولا زر الاعتماد', async () => {
     setAuthSession(session('user'));
+    mockedOrder.mockResolvedValue(PREVIEW_ORDER);
     await upload(PROCESSED);
-    expect(await screen.findByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /تنزيل النسخة الأولية PDF/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /اعتماد التقرير/ })).not.toBeInTheDocument();
   });
 
-  it('يعرض نسخة المحامى الكاملة ونسخة العميل المبسطة جنباً إلى جنب', async () => {
-    setAuthSession(session('user'));
+  it('المالك (admin): يرى أزرار التنزيل المباشرة ونسخة العميل بلا لوحة طلب', async () => {
+    setAuthSession(session('admin'));
     await upload(PROCESSED);
     expect(await screen.findByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'تنزيل نسخة العميل المبسطة بصيغة Word' })).toBeInTheDocument();
+    expect(mockedOrder).not.toHaveBeenCalled();
+    expect(await screen.findByText('لا طلبات بانتظار التأكيد.')).toBeInTheDocument();
   });
 
   it('لا يظهر التنزيل عند فشل استخراج النص', async () => {

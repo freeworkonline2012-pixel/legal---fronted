@@ -16,9 +16,11 @@ const SEVERITY_STYLE: Record<ContractFinding['severity'], string> = {
 interface Props {
   findings: ContractFinding[] | undefined;
   model: ContractResponse['contract_findings_model'];
+  /** قبل السداد: العنوان والدرجة فقط؛ الشرح والاقتراح والشواهد تُفتح بعد السداد (الخادم يحجبها أصلاً) */
+  locked?: boolean;
 }
 
-export function ContractFindingsPanel({ findings, model }: Props) {
+export function ContractFindingsPanel({ findings, model, locked = false }: Props) {
   // عقد قديم لم يُحلَّل أصلاً: لا لوحة
   if (findings === undefined) return null;
   const modelNote =
@@ -50,6 +52,16 @@ export function ContractFindingsPanel({ findings, model }: Props) {
         <ul className="mt-3 space-y-2">
           {findings.map((f) => (
             <li key={f.id} className="rounded-md border border-border-default">
+              {locked ? (
+                <div className="flex min-h-[44px] flex-wrap items-center gap-2 px-3 py-2 text-body-sm text-text-primary">
+                  <span className={`rounded-full px-2.5 py-0.5 text-caption font-semibold ${SEVERITY_STYLE[f.severity] ?? SEVERITY_STYLE['متوسط']}`}>
+                    {f.severity}
+                  </span>
+                  <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-caption text-text-secondary">{f.kind_label}</span>
+                  <span className="font-semibold">{f.title}</span>
+                  <span className="text-caption text-text-tertiary">التفاصيل بعد السداد</span>
+                </div>
+              ) : (
               <details>
                 <summary className="flex min-h-[44px] cursor-pointer flex-wrap items-center gap-2 px-3 py-2 text-body-sm text-text-primary">
                   <span className={`rounded-full px-2.5 py-0.5 text-caption font-semibold ${SEVERITY_STYLE[f.severity] ?? SEVERITY_STYLE['متوسط']}`}>
@@ -82,6 +94,7 @@ export function ContractFindingsPanel({ findings, model }: Props) {
                   ) : null}
                 </div>
               </details>
+              )}
             </li>
           ))}
         </ul>

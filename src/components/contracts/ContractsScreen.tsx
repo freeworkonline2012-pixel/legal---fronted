@@ -38,6 +38,8 @@ import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 import { isGuestUser } from '@/lib/guest';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { ExportButtons } from '@/components/ui/ExportButtons';
+import { ContractOrderPanel } from './ContractOrderPanel';
+import { PendingPaymentsPanel } from './PendingPaymentsPanel';
 import { ContractFindingsPanel } from './ContractFindingsPanel';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
 import { CitationCardSkeleton } from '@/components/ui/Skeleton';
@@ -47,7 +49,9 @@ import { ContractClauseCard } from './ContractClauseCard';
 
 type ScreenStatus = 'idle' | 'loading' | 'done' | 'error';
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
+// العميل: Word فقط (بلا بيانات شخصية لأطراف العقد)؛ المالك/admin يرفع PDF أيضاً (الخادم يفرض نفس القاعدة)
+const CLIENT_EXTENSIONS = ['.docx'];
+const ADMIN_EXTENSIONS = ['.pdf', '.docx'];
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB — يطابق MAX_UPLOAD_BYTES فى backend
 
 const UPLOAD_PROGRESS_STEPS = [
@@ -59,11 +63,11 @@ const UPLOAD_PROGRESS_STEPS = [
 const MAX_PROGRESS_INDEX = UPLOAD_PROGRESS_STEPS.length - 1;
 const PROGRESS_TICK_MS = 1400;
 
-function validateFile(file: File): string | undefined {
+function validateFile(file: File, isAdmin: boolean): string | undefined {
   const lowerName = file.name.toLowerCase();
-  const hasAllowedExtension = ALLOWED_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
-  if (!hasAllowedExtension) {
-    return 'نوع ملف غير مدعوم — المسموح: PDF أو DOCX فقط.';
+  const allowed = isAdmin ? ADMIN_EXTENSIONS : CLIENT_EXTENSIONS;
+  if (!allowed.some((ext) => lowerName.endsWith(ext))) {
+    return isAdmin ? 'نوع ملف غير مدعوم — المسموح: PDF أو DOCX فقط.' : 'المسموح رفع ملف Word (DOCX) فقط.';
   }
   if (file.size > MAX_FILE_BYTES) {
     return 'حجم الملف كبير جداً — الحد الأقصى 10 ميجابايت.';
@@ -83,6 +87,8 @@ export function ContractsScreen() {
   const [validationError, setValidationError] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  /** إقرار العميل بأن الملف خالٍ من البيانات الشخصية لأطراف العقد (لا يُطلب من المالك) */
+  const [noPersonalData, setNoPersonalData] = useState(false);
   const [approval, setApproval] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,14 +120,18 @@ export function ContractsScreen() {
       setValidationError(undefined);
       return;
     }
-    const error = validateFile(selected);
+    const error = validateFile(selected, isAdmin);
     setValidationError(error);
     setFile(error ? null : selected);
   }
 
   async function runUpload() {
     if (!file) {
-      setValidationError('اختر ملف عقد أولاً (PDF أو DOCX).');
+      setValidationError(isAdmin ? 'اختر ملف عقد أولاً (PDF أو DOCX).' : 'اختر ملف العقد بصيغة Word (DOCX) أولاً.');
+      return;
+    }
+    if (!isAdmin && !noPersonalData) {
+      setValidationError('أقرّ أولاً بأن الملف لا يتضمن بيانات شخصية لأطراف العقد.');
       return;
     }
     cancelledRef.current = false;
@@ -174,6 +184,16 @@ export function ContractsScreen() {
     void runUpload();
   }
 
+  /** بعد تأكيد السداد: نعيد جلب العقد كاملاً (الخادم يرفع الحجب) */
+  async function refreshResult(contractId: string) {
+    try {
+      const fresh = await fetchContract(contractId);
+      setResult(fresh);
+    } catch {
+      /* يبقى العرض المحجوب؛ يعيد المستخدم التحديث يدوياً */
+    }
+  }
+
   async function handleApprove(contractId: string) {
     setApproval('loading');
     try {
@@ -221,6 +241,7 @@ export function ContractsScreen() {
 
   function handleReset() {
     setApproval('idle');
+    setNoPersonalData(false);
     setFile(null);
     setResult(null);
     setStatus('idle');
@@ -310,7 +331,11 @@ export function ContractsScreen() {
                   ref={fileInputRef}
                   id="contract-file"
                   type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept={
+                    isAdmin
+                      ? '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                      : '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                  }
                   onChange={handleFileChange}
                   disabled={status === 'loading'}
                   aria-invalid={Boolean(validationError) || undefined}
@@ -325,13 +350,26 @@ export function ContractsScreen() {
                 </p>
               ) : (
                 <p id="contract-file-helper" className="mt-1.5 text-caption text-text-tertiary">
-                  PDF أو DOCX فقط — حتى 10 ميجابايت.
+                  {isAdmin ? 'PDF أو DOCX — حتى 10 ميجابايت.' : 'ملف Word (DOCX) فقط — حتى 10 ميجابايت.'}
                 </p>
               )}
             </div>
 
+            {isAdmin ? null : (
+              <label className="flex items-start gap-2 text-body-sm text-text-primary">
+                <input
+                  type="checkbox"
+                  checked={noPersonalData}
+                  onChange={(e) => setNoPersonalData(e.target.checked)}
+                  disabled={status === 'loading'}
+                  className="mt-1"
+                />
+                <span>أقرّ بأن الملف لا يتضمن بيانات شخصية لأطراف العقد (أسماء، أرقام قومية، عناوين، أرقام هواتف)، وأننى حذفتها أو استبدلتها بعبارات عامة.</span>
+              </label>
+            )}
+
             <div className="flex items-center gap-3">
-              <Button type="submit" loading={status === 'loading'} disabled={status === 'loading' || !file}>
+              <Button type="submit" loading={status === 'loading'} disabled={status === 'loading' || !file || (!isAdmin && !noPersonalData)}>
                 <UploadCloud className="h-4 w-4" aria-hidden="true" />
                 رفع وتحليل العقد
               </Button>
@@ -403,36 +441,47 @@ export function ContractsScreen() {
                       ) : null}
                     </div>
 
+                    {result.details_locked ? (
+                      <p role="status" className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-secondary">
+                        هذه معاينة أولية: تظهر حالة كل بند وعناوين الملاحظات فقط. التفسير القانونى والمواد المطابَقة والصياغات المقترحة تُفتح بعد السداد.
+                      </p>
+                    ) : null}
+
                     {/* تنزيل التقرير (الهجرة 203): التقرير الآلى مسودة عمل حتى يعتمده
                         المدير؛ قبل الاعتماد يرد الخادم 409 برسالة «قيد المراجعة البشرية»
                         فتظهر تحت الزر (والمدير وحده يُنزِّل المسودة ويعتمدها). */}
                     {result.status === 'processed' ? (
-                      <div className="space-y-3 rounded-lg border border-border-default bg-surface p-4">
-                        <ExportButtons kind="contracts" id={result.id} label="تنزيل تقرير المراجعة" trackedChanges clientEdition />
-                        {isAdmin ? (
-                          <div className="flex flex-wrap items-center gap-2 border-t border-border-default pt-3">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              loading={approval === 'loading'}
-                              disabled={approval === 'loading' || approval === 'done'}
-                              onClick={() => void handleApprove(result.id)}
-                            >
-                              اعتماد التقرير للعميل
-                            </Button>
-                            {approval === 'done' ? (
-                              <span role="status" className="text-body-sm text-text-secondary">
-                                اعتُمد التقرير — صار متاحاً لصاحب العقد.
-                              </span>
-                            ) : null}
-                            {approval === 'error' ? (
-                              <span role="alert" className="text-body-sm text-error">
-                                تعذّر اعتماد التقرير — حاول مرة أخرى.
-                              </span>
-                            ) : null}
+                      isAdmin ? (
+                        <>
+                          <PendingPaymentsPanel />
+                          <div className="space-y-3 rounded-lg border border-border-default bg-surface p-4">
+                            <ExportButtons kind="contracts" id={result.id} label="تنزيل تقرير المراجعة" trackedChanges clientEdition />
+                            <div className="flex flex-wrap items-center gap-2 border-t border-border-default pt-3">
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                loading={approval === 'loading'}
+                                disabled={approval === 'loading' || approval === 'done'}
+                                onClick={() => void handleApprove(result.id)}
+                              >
+                                اعتماد التقرير للعميل
+                              </Button>
+                              {approval === 'done' ? (
+                                <span role="status" className="text-body-sm text-text-secondary">
+                                  اعتُمد التقرير — صار متاحاً لصاحب العقد.
+                                </span>
+                              ) : null}
+                              {approval === 'error' ? (
+                                <span role="alert" className="text-body-sm text-error">
+                                  تعذّر اعتماد التقرير — حاول مرة أخرى.
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                        ) : null}
-                      </div>
+                        </>
+                      ) : (
+                        <ContractOrderPanel contractId={result.id} onPaid={() => void refreshResult(result.id)} />
+                      )
                     ) : null}
 
                     {result.warnings && result.warnings.length > 0 ? (
@@ -446,7 +495,7 @@ export function ContractsScreen() {
                       </div>
                     ) : null}
 
-                    <ContractFindingsPanel findings={result.contract_findings} model={result.contract_findings_model ?? null} />
+                    <ContractFindingsPanel findings={result.contract_findings} model={result.contract_findings_model ?? null} locked={result.details_locked === true} />
 
                     {result.clauses && result.clauses.length > 0 ? (
                       result.clauses.map((clause) => <ContractClauseCard key={clause.id} clause={clause} contractId={result.id} />)

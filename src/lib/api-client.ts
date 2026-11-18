@@ -12,6 +12,7 @@ import type {
   AnalyzeDocumentResponse,
   AuthResponse,
   ContractClauseItem,
+  ContractOrder,
   ContractResponse,
   CreateMemoRequest,
   CreateMemoResponse,
@@ -30,6 +31,7 @@ import type {
   LegalReferenceType,
   LawItem,
   LawListResponse,
+  PendingPayment,
   LawStatusKey,
   QuestionAnswerResponse,
   QuestionHistoryResponse,
@@ -69,6 +71,32 @@ export class ApiError extends Error {
 
 const API_BASE_URL: string =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
+
+/** كـrequestJson لكن يمرّر رسالة الخادم العربية (409/402/400/403) للعرض — لعمليات طلب المراجعة التى رسائلها جزء من التجربة */
+async function requestJsonDetailed<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) };
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      if (typeof body.message === 'string') detail = body.message;
+      else if (Array.isArray(body.message) && typeof body.message[0] === 'string') detail = body.message[0];
+    } catch {
+      // جسم غير JSON
+    }
+    if (res.status === 401) throw new ApiError(401, 'انتهت الجلسة — سجّل الدخول من جديد.');
+    throw new ApiError(res.status, detail && detail.length < 300 ? detail : `تعذّر تنفيذ الطلب (HTTP ${res.status}).`);
+  }
+  return (await res.json()) as T;
+}
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
@@ -507,7 +535,7 @@ export function parseDownloadFilename(header: string | null): string | null {
 function exportErrorMessage(status: number, backendMessage: string | undefined, format: ExportFormat): string {
   if (status === 401) return 'سجّل الدخول أولاً لتنزيل المستند.';
   if (status === 404) return 'تعذّر العثور على هذا المستند ضمن حسابك.';
-  if (status === 409 && backendMessage) return backendMessage;
+  if ((status === 409 || status === 402) && backendMessage) return backendMessage;
   if (status === 429) return 'طلبات تنزيل كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.';
   if (status === 503 && format === 'pdf') return 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.';
   return `تعذّر تنزيل المستند (HTTP ${status}).`;
@@ -573,6 +601,75 @@ export async function approveContractReport(
     `/exports/contracts/${encodeURIComponent(id)}/approve`,
     { method: 'POST', body: JSON.stringify(note ? { note } : {}) },
   );
+}
+
+/* ------------------------------------------------------------------------ */
+/* طلب مراجعة العقد: نسخة أولية ← موافقة ← سداد ← تسليم (الهجرة 262)          */
+/* ------------------------------------------------------------------------ */
+
+/** GET /api/exports/contracts/{id}/order — مرحلة الطلب وما يتاح للتنزيل */
+export async function fetchContractOrder(id: string): Promise<ContractOrder> {
+  return requestJsonDetailed<ContractOrder>(`/exports/contracts/${encodeURIComponent(id)}/order`);
+}
+
+/** POST .../order/approve — موافقة العميل على النسخة الأولية (تثبّت السعر) */
+export async function approveContractOrder(id: string): Promise<ContractOrder> {
+  return requestJsonDetailed<ContractOrder>(`/exports/contracts/${encodeURIComponent(id)}/order/approve`, { method: 'POST', body: '{}' });
+}
+
+/** POST .../order/payment — إعلان السداد بمرجع العملية (ينتظر تأكيد المالك) */
+export async function submitContractPayment(id: string, reference: string): Promise<ContractOrder> {
+  return requestJsonDetailed<ContractOrder>(`/exports/contracts/${encodeURIComponent(id)}/order/payment`, {
+    method: 'POST',
+    body: JSON.stringify({ reference }),
+  });
+}
+
+/** POST .../order/confirm-payment — تأكيد السداد (admin فقط) */
+export async function confirmContractPayment(id: string): Promise<ContractOrder> {
+  return requestJsonDetailed<ContractOrder>(`/exports/contracts/${encodeURIComponent(id)}/order/confirm-payment`, { method: 'POST', body: '{}' });
+}
+
+/** GET /api/exports/contracts/orders/pending — طلبات بانتظار تأكيد السداد (admin فقط) */
+export async function fetchPendingPayments(): Promise<PendingPayment[]> {
+  return requestJsonDetailed<PendingPayment[]>('/exports/contracts/orders/pending');
+}
+
+/** GET /api/exports/contracts/{id}/preliminary — النسخة الأولية PDF بعلامة «نسخة أولية» */
+export async function downloadContractPreliminary(id: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/exports/contracts/${encodeURIComponent(id)}/preliminary`, { headers, cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      detail = typeof body.message === 'string' ? body.message : undefined;
+    } catch {
+      // جسم غير JSON
+    }
+    throw new ApiError(res.status, exportErrorMessage(res.status, detail, 'pdf'));
+  }
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? 'contract-preliminary.pdf';
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
 }
 
 /* ------------------------------------------------------------------------ */
