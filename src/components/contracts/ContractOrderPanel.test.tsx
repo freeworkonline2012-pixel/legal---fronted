@@ -10,7 +10,6 @@ jest.mock('@/lib/api-client', () => {
     fetchContractOrder: jest.fn(),
     approveContractOrder: jest.fn(),
     submitContractPayment: jest.fn(),
-    downloadContractPreliminary: jest.fn(),
     downloadExport: jest.fn(),
   };
 });
@@ -18,7 +17,6 @@ jest.mock('@/lib/api-client', () => {
 import {
   ApiError,
   approveContractOrder,
-  downloadContractPreliminary,
   downloadExport,
   fetchContractOrder,
   submitContractPayment,
@@ -27,7 +25,6 @@ import {
 const fetchOrder = fetchContractOrder as jest.MockedFunction<typeof fetchContractOrder>;
 const approve = approveContractOrder as jest.MockedFunction<typeof approveContractOrder>;
 const pay = submitContractPayment as jest.MockedFunction<typeof submitContractPayment>;
-const prelim = downloadContractPreliminary as jest.MockedFunction<typeof downloadContractPreliminary>;
 const dl = downloadExport as jest.MockedFunction<typeof downloadExport>;
 
 function order(over: Partial<ContractOrder> = {}): ContractOrder {
@@ -42,7 +39,7 @@ function order(over: Partial<ContractOrder> = {}): ContractOrder {
     payment_reference: null,
     approved_at: null,
     paid_at: null,
-    can_download_preliminary: true,
+    can_download_preliminary: false,
     can_download_final: false,
     awaiting_human_review: false,
     details_locked: true,
@@ -51,7 +48,7 @@ function order(over: Partial<ContractOrder> = {}): ContractOrder {
 }
 
 beforeEach(() => {
-  [fetchOrder, approve, pay, prelim, dl].forEach((m) => m.mockReset());
+  [fetchOrder, approve, pay, dl].forEach((m) => m.mockReset());
 });
 
 describe('ContractOrderPanel', () => {
@@ -62,15 +59,14 @@ describe('ContractOrderPanel', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('مرحلة المعاينة: ينزّل النسخة الأولية، والموافقة معطلة حتى يؤشّر الإقرار، ثم يوافق', async () => {
+  it('مرحلة المعاينة: لا زر تنزيل قبل السداد، والموافقة معطلة حتى يؤشّر الإقرار، ثم يوافق', async () => {
     fetchOrder.mockResolvedValue(order());
-    prelim.mockResolvedValue(undefined);
     approve.mockResolvedValue(order({ stage: 'approved', approved_at: '2026-11-18T10:00:00Z' }));
     const user = userEvent.setup();
     render(<ContractOrderPanel contractId="c1" />);
 
-    await user.click(await screen.findByRole('button', { name: /تنزيل النسخة الأولية PDF/ }));
-    expect(prelim).toHaveBeenCalledWith('c1');
+    await screen.findByRole('button', { name: 'أوافق وأتابع للسداد' });
+    expect(screen.queryByRole('button', { name: /تنزيل/ })).not.toBeInTheDocument();
 
     const go = screen.getByRole('button', { name: 'أوافق وأتابع للسداد' });
     expect(go).toBeDisabled();
@@ -148,6 +144,6 @@ describe('ContractOrderPanel', () => {
     const user = userEvent.setup();
     render(<ContractOrderPanel contractId="c1" />);
     await user.click(await screen.findByRole('button', { name: 'إعادة المحاولة' }));
-    expect(await screen.findByRole('button', { name: /تنزيل النسخة الأولية PDF/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'أوافق وأتابع للسداد' })).toBeInTheDocument();
   });
 });

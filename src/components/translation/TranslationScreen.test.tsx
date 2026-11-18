@@ -91,11 +91,12 @@ describe('TranslationScreen', () => {
     expect(screen.queryByLabelText(/ملف العقد/)).not.toBeInTheDocument();
   });
 
-  it('يعرض تنبيه المسودة وإفصاح الخصوصية ويعطل البدء قبل الملف والموافقة', async () => {
+  it('يعرض إفصاح الخصوصية ويعطل البدء قبل الملف والموافقة، بلا مربع تنبيه المسودة العلوى', async () => {
     setAuthSession(SESSION);
     render(<TranslationScreen />);
-    expect(await screen.findByText(/مسودة ترجمة تحتاج مراجعة/)).toBeInTheDocument();
-    expect(screen.getAllByText(/بما فيه الأسماء والعناوين/).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText(/بما فيه الأسماء والعناوين/)).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByText(/مسودة ترجمة تحتاج مراجعة/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ابدأ الترجمة' })).toBeDisabled();
   });
 

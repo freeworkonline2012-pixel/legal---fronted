@@ -52,7 +52,7 @@ const PREVIEW_ORDER: ContractOrder = {
   payment_reference: null,
   approved_at: null,
   paid_at: null,
-  can_download_preliminary: true,
+  can_download_preliminary: false,
   can_download_final: false,
   awaiting_human_review: false,
   details_locked: true,
@@ -90,11 +90,12 @@ describe('ContractsScreen — تنزيل التقرير واعتماده', () =>
     clearAuthSession();
   });
 
-  it('العميل: يرى لوحة الطلب (نسخة أولية) لا أزرار التنزيل النهائى ولا زر الاعتماد', async () => {
+  it('العميل: يرى لوحة الطلب (معاينة) بلا أى زر تنزيل ولا زر الاعتماد', async () => {
     setAuthSession(session('user'));
     mockedOrder.mockResolvedValue(PREVIEW_ORDER);
     await upload(PROCESSED);
-    expect(await screen.findByRole('button', { name: /تنزيل النسخة الأولية PDF/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'أوافق وأتابع للسداد' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /تنزيل/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'تنزيل تقرير المراجعة بصيغة PDF' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /اعتماد التقرير/ })).not.toBeInTheDocument();
   });

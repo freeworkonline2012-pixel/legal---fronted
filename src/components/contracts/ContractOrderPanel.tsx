@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, FileDown, Lock, RefreshCw } from 'lucide-react';
-import { ApiError, approveContractOrder, downloadContractPreliminary, downloadExport, fetchContractOrder, submitContractPayment } from '@/lib/api-client';
+import { ApiError, approveContractOrder, downloadExport, fetchContractOrder, submitContractPayment } from '@/lib/api-client';
 import type { ContractOrder } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
@@ -21,7 +21,7 @@ export interface ContractOrderPanelProps {
 }
 
 const STAGES: Array<{ id: ContractOrder['stage']; label: string }> = [
-  { id: 'preview', label: 'نسخة أولية' },
+  { id: 'preview', label: 'معاينة' },
   { id: 'approved', label: 'موافقة' },
   { id: 'payment_submitted', label: 'سداد' },
   { id: 'paid', label: 'تسليم' },
@@ -118,28 +118,16 @@ export function ContractOrderPanel({ contractId, onPaid }: ContractOrderPanelPro
       {order.stage === 'preview' ? (
         <div className="space-y-3">
           <p className="text-body-sm text-text-secondary">
-            هذه <strong>نسخة أولية</strong> من مراجعة عقدك (حالة كل بند وعناوين الملاحظات). التفسير والمواد القانونية والصياغات المقترحة
-            والتنزيل النهائى بصيغة Word أو PDF تتاح بعد موافقتك وسداد مقابل الخدمة.
+            هذه <strong>معاينة على الشاشة</strong> لمراجعة عقدك (حالة كل بند وعناوين الملاحظات). التفسير والمواد القانونية والصياغات المقترحة،
+            وتنزيل العقد المراجَع بصيغة <strong>Word أو PDF</strong>، تُتاح بعد موافقتك وسداد مقابل الخدمة.
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              loading={busy === 'preliminary'}
-              disabled={busy !== null || !order.can_download_preliminary}
-              onClick={() => void run('preliminary', () => downloadContractPreliminary(contractId))}
-            >
-              <FileDown className="h-4 w-4" aria-hidden="true" />
-              تنزيل النسخة الأولية PDF
-            </Button>
-          </div>
           <div className="space-y-2 border-t border-border-default pt-3">
             <p className="text-body-sm text-text-primary">
               مقابل الخدمة: <strong>{priceLabel(order)}</strong>
             </p>
             <label className="flex items-start gap-2 text-body-sm text-text-primary">
               <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1" disabled={order.fee_amount === null} />
-              <span>اطّلعت على النسخة الأولية وأوافق على المتابعة وسداد مقابل الخدمة.</span>
+              <span>اطّلعت على المعاينة وأوافق على المتابعة وسداد مقابل الخدمة.</span>
             </label>
             <Button
               size="sm"

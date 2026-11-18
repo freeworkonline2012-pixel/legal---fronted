@@ -218,14 +218,6 @@ export function TranslationScreen() {
         </p>
       </div>
 
-      <div
-        role="note"
-        className="mb-6 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-body-sm text-text-primary"
-      >
-        الناتج ترجمة آلية مساعدة — «مسودة ترجمة تحتاج مراجعة». راجع كل رقم ومبلغ وتاريخ واسم قبل التوقيع أو التقديم
-        لأى جهة؛ الأصل هو المرجع عند أى اختلاف، ولا تُعد الترجمة رأياً قانونياً.
-      </div>
-
       {authed === false ? (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-border-default bg-surface p-8 text-center">
           <LogIn className="h-8 w-8 text-text-tertiary" aria-hidden="true" />

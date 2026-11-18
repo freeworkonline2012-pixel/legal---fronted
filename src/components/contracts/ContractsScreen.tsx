@@ -443,7 +443,7 @@ export function ContractsScreen() {
 
                     {result.details_locked ? (
                       <p role="status" className="rounded-md bg-surface-muted px-4 py-3 text-body-sm text-text-secondary">
-                        هذه معاينة أولية: تظهر حالة كل بند وعناوين الملاحظات فقط. التفسير القانونى والمواد المطابَقة والصياغات المقترحة تُفتح بعد السداد.
+                        هذه معاينة على الشاشة: تظهر حالة كل بند وعناوين الملاحظات فقط. التفسير القانونى والمواد المطابَقة والصياغات المقترحة تُفتح بعد السداد.
                       </p>
                     ) : null}
 
