@@ -82,10 +82,7 @@ async function fillMinimum(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function pickType(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
-  const select = await screen.findByRole('combobox', { name: /اختر نوع العقد/ });
-  const option = within(select).getAllByRole('option').find((o) => name.test(o.textContent ?? ''));
-  if (!option) throw new Error(`النوع غير موجود فى القائمة: ${String(name)}`);
-  await user.selectOptions(select, option as HTMLOptionElement);
+  await user.click(await screen.findByRole('button', { name }));
 }
 
 describe('ContractDraftingScreen', () => {
@@ -116,21 +113,44 @@ describe('ContractDraftingScreen', () => {
   it('المسجَّل: يحمّل الأنواع من الخادم ويعرضها فى قائمة منسدلة', async () => {
     setAuthSession(SESSION);
     render(<ContractDraftingScreen />);
-    expect(await screen.findByRole('option', { name: /اتفاقية سرية/ })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /عقد إيجار/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /اتفاقية سرية/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /عقد إيجار/ })).toBeInTheDocument();
     expect(screen.queryByLabelText('اسم الطرف الأول')).not.toBeInTheDocument();
   });
 
-  it('الصفحة لا تعرض أى ملاحظة صفراء، وأنواع العقود كلها فى قائمة منسدلة واحدة', async () => {
+  it('الصفحة بلا ملاحظة صفراء ولا قائمة منسدلة: بحث + قوالب جاهزة + تصنيفات', async () => {
     setAuthSession(SESSION);
     render(<ContractDraftingScreen />);
-    const select = await screen.findByRole('combobox', { name: /اختر نوع العقد/ });
+    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
     expect(screen.queryByText(/الناتج مسودة دائماً/)).not.toBeInTheDocument();
-    const labels = within(select)
-      .getAllByRole('option')
-      .map((o) => o.textContent);
-    expect(labels).toEqual(expect.arrayContaining(['اتفاقية سرية', 'عقد إيجار', 'عقد آخر']));
-    expect(screen.queryByRole('button', { name: /عقد إيجار/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /اختر نوع العقد/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'قوالب جاهزة محكَّمة' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'تصنيفات العقود' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /عقود البيع/ })).toBeInTheDocument();
+  });
+
+  it('تصفّح تصنيف ثم اختيار صيغة منه: اسم الصيغة يملأ «نوع العقد» ويمكن تغيير النوع', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup();
+    render(<ContractDraftingScreen />);
+    await user.click(await screen.findByRole('button', { name: /عقود البيع/ }));
+    await user.click(screen.getByRole('button', { name: /عقد بيع شقة بالتقسيط/ }));
+    expect(screen.getByRole('textbox', { name: /نوع العقد/ })).toHaveValue('عقد بيع شقة بالتقسيط');
+    expect(screen.getByRole('region', { name: 'النوع المختار' })).toHaveTextContent('عقد بيع شقة بالتقسيط');
+    await user.click(screen.getByRole('button', { name: 'تغيير النوع' }));
+    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+  });
+
+  it('البحث يجد الصيغة بأى إملاء، وغير الموجود يُعرض كنوع عقد آخر', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup();
+    render(<ContractDraftingScreen />);
+    await user.type(await screen.findByRole('searchbox'), 'ايجار سياره');
+    expect(await screen.findByRole('button', { name: /عقد إيجار سيارة/ })).toBeInTheDocument();
+    await user.clear(screen.getByRole('searchbox'));
+    await user.type(screen.getByRole('searchbox'), 'عقد توريد أجهزة');
+    await user.click(await screen.findByRole('button', { name: /صُغ «عقد توريد أجهزة» كنوع عقد آخر/ }));
+    expect(screen.getByRole('textbox', { name: /نوع العقد/ })).toHaveValue('عقد توريد أجهزة');
   });
 
   it('فشل تحميل الأنواع: رسالة وزر إعادة محاولة يعمل', async () => {
@@ -140,7 +160,7 @@ describe('ContractDraftingScreen', () => {
     render(<ContractDraftingScreen />);
     expect(await screen.findByRole('alert')).toHaveTextContent('تعذّر الاتصال بالخادم');
     await user.click(screen.getByRole('button', { name: /إعادة المحاولة/ }));
-    expect(await screen.findByRole('option', { name: /اتفاقية سرية/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /اتفاقية سرية/ })).toBeInTheDocument();
   });
 
   it('اختيار نوع: النموذج بالافتراضيات، وحقل showWhen يظهر عند تبديل الاختيار', async () => {

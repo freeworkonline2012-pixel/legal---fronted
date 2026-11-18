@@ -1,12 +1,12 @@
 /**
  * ContractDraftingScreen — «صياغة العقود» (الخدمة الأولى ضمن «العقود القانونية»).
  *
- * قرار المنتج (2026-11-18): الصياغة حتمية بالكامل على الخادم — قوالب بنود محكَّمة تُملأ بإجابات المستخدم، بلا نموذج
- * لغوى ولا أى نداء خارجى، فلا تغادر بيانات الأطراف المنصة ولا يُخزَّن شىء منها (التنزيل يعيد التوليد من الإجابات نفسها).
- * كل مسودة تمر على بوابة جودة تستعمل قواعد تدقيق العقود نفسها. الناتج مسودة دائماً تحتاج مراجعة محامٍ قبل التوقيع.
+ * اختيار النوع: بحث + قوالب جاهزة + تصنيفات ثم صيغ (`ContractTypePicker` + `contract-catalog`، مرجع التصنيف «موسوعة صيغ العقود»).
+ * - القوالب الثابتة (خدمات/إيجار/سرية): صياغة حتمية على الخادم بلا نموذج لغوى.
+ * - «عقد آخر» (أى صيغة غيرها): هيكل ثابت + بنود الموضوع بنموذج لغوى تحت حراسة الخصوصية والمخرجات.
+ * كل مسودة تمر على بوابة جودة تستعمل قواعد مراجعة العقود نفسها، والناتج مسودة تحتاج مراجعة محامٍ قبل التوقيع.
  *
  * هذه الشاشة لا تحتوى أى منطق قانونى: الأسئلة والاختيارات والافتراضيات والتحقق والنص كلها من الخادم.
- * الأنواع المدعومة حالياً: عقد خدمات، عقد إيجار، اتفاقية سرية (يضيف الخادم أنواعاً جديدة بلا تغيير هنا).
  */
 
 'use client';
@@ -31,6 +31,7 @@ import {
   withParagraph,
 } from '@/lib/drafting';
 import { Button, ButtonLink } from '@/components/ui/Button';
+import { ContractTypePicker, type TypePick } from './ContractTypePicker';
 import { TextArea } from '@/components/ui/TextArea';
 import { TextField } from '@/components/ui/TextField';
 
@@ -157,15 +158,24 @@ export function ContractDraftingScreen() {
 
   const spec = types.find((t) => t.id === typeId) ?? null;
 
-  function chooseType(next: DraftTypeSpec) {
+  function chooseType({ spec: next, title }: TypePick) {
     setTypeId(next.id);
     setRole(next.roles[0]?.value ?? '');
-    setAnswers(initialAnswers(next));
+    const initial = initialAnswers(next);
+    // «عقد آخر» من فهرس الصيغ: اسم الصيغة يملأ خانة «نوع العقد» تلقائياً (يظل قابلاً للتعديل)
+    setAnswers(title && next.assisted ? { ...initial, contract_type_name: title } : initial);
     setFieldErrors({});
     setMessage(null);
     setResult(null);
     setEdited(null);
     setEditing(false);
+  }
+
+  function changeType() {
+    setTypeId(null);
+    setAnswers({});
+    setFieldErrors({});
+    setMessage(null);
   }
 
   function setAnswer(id: string, value: string) {
@@ -273,29 +283,19 @@ export function ContractDraftingScreen() {
           ) : null}
 
           {typesStatus === 'ready' && !result ? (
-            <section className="mb-6">
-              <label htmlFor="draft-type" className="mb-3 block text-body font-semibold text-text-primary">
-                ١. اختر نوع العقد
-              </label>
-              <select
-                id="draft-type"
-                value={typeId ?? ''}
-                disabled={busy}
-                onChange={(e) => {
-                  const next = types.find((t) => t.id === e.target.value);
-                  if (next) chooseType(next);
-                }}
-                className={SELECT_CLASSES}
-              >
-                {typeId === null ? <option value="">اختر نوع العقد…</option> : null}
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              {spec ? <p className="mt-2 text-body-sm text-text-secondary">{spec.description}</p> : null}
-            </section>
+            spec ? (
+              <section aria-label="النوع المختار" className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-border-default bg-surface px-4 py-3">
+                <div>
+                  <p className="text-caption text-text-tertiary">نوع العقد المختار</p>
+                  <p className="text-body font-semibold text-text-primary">{spec.assisted ? (answers.contract_type_name?.trim() || spec.label) : spec.label}</p>
+                </div>
+                <Button type="button" variant="secondary" disabled={busy} onClick={changeType}>
+                  تغيير النوع
+                </Button>
+              </section>
+            ) : (
+              <ContractTypePicker types={types} disabled={busy} onPick={chooseType} />
+            )
           ) : null}
 
           {typesStatus === 'ready' && spec && !result ? (
