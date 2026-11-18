@@ -12,14 +12,16 @@ import type { DraftResult, DraftTypeSpec } from '@/lib/drafting';
 
 jest.mock('@/lib/api-client', () => {
   const actual = jest.requireActual('@/lib/api-client');
-  return { ...actual, fetchDraftTypes: jest.fn(), generateDraft: jest.fn(), downloadDraft: jest.fn() };
+  return { ...actual, fetchDraftTypes: jest.fn(), generateDraft: jest.fn(), downloadDraft: jest.fn(), generateCustomDraft: jest.fn(), downloadCustomDraft: jest.fn() };
 });
 
-import { ApiError, DraftFieldError, downloadDraft, fetchDraftTypes, generateDraft } from '@/lib/api-client';
+import { ApiError, DraftFieldError, downloadCustomDraft, downloadDraft, fetchDraftTypes, generateCustomDraft, generateDraft } from '@/lib/api-client';
 
 const mockedTypes = fetchDraftTypes as jest.MockedFunction<typeof fetchDraftTypes>;
 const mockedGenerate = generateDraft as jest.MockedFunction<typeof generateDraft>;
 const mockedDownload = downloadDraft as jest.MockedFunction<typeof downloadDraft>;
+const mockedGenCustom = generateCustomDraft as jest.MockedFunction<typeof generateCustomDraft>;
+const mockedDownloadCustom = downloadCustomDraft as jest.MockedFunction<typeof downloadCustomDraft>;
 
 const SESSION = {
   access_token: 'a',
@@ -45,6 +47,17 @@ const TYPES: DraftTypeSpec[] = [
     ],
   },
   { id: 'lease', label: 'عقد إيجار', description: 'وصف الإيجار', roles: [{ value: 'lessor', label: 'المؤجر' }], fields: [] },
+  {
+    id: 'custom',
+    assisted: true,
+    label: 'عقد آخر',
+    description: 'أى عقد آخر',
+    roles: [{ value: 'first', label: 'أنا الطرف الأول' }, { value: 'second', label: 'أنا الطرف الثانى' }],
+    fields: [
+      { id: 'contract_type_name', label: 'نوع العقد', kind: 'text', required: true, group: 'نوع العقد' },
+      { id: 'purpose', label: 'وصف الصفقة', kind: 'longtext', required: true, group: 'نوع العقد' },
+    ],
+  },
 ];
 
 const RESULT: DraftResult = {
@@ -73,6 +86,8 @@ describe('ContractDraftingScreen', () => {
     mockedTypes.mockReset();
     mockedGenerate.mockReset();
     mockedDownload.mockReset();
+    mockedGenCustom.mockReset();
+    mockedDownloadCustom.mockReset();
     mockedTypes.mockResolvedValue(TYPES);
     clearAuthSession();
   });
@@ -220,5 +235,88 @@ describe('ContractDraftingScreen', () => {
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     await user.click(await screen.findByRole('button', { name: 'تعديل الإجابات' }));
     expect(screen.getByLabelText('اسم الطرف الأول')).toHaveValue('شركة الأمل');
+  });
+
+  describe('«عقد آخر» (صياغة بمساعدة نموذج لغوى)', () => {
+    const CUSTOM_RESULT: DraftResult = {
+      ...RESULT,
+      typeId: 'custom',
+      assisted: true,
+      blankSlots: 1,
+      title: 'عقد توريد',
+      typeLabel: 'عقد توريد',
+      clauses: [
+        { number: 1, heading: 'البند الأول', title: 'الثمن', paragraphs: ['يسدد الطرف الثانى الثمن خلال [____] يوماً من الاستلام.'] },
+        { number: 2, heading: 'البند الثانى', title: 'التسليم', paragraphs: ['يسلم الطرف الأول المعدات فى الموعد المتفق عليه.'] },
+      ],
+    };
+
+    async function openCustom(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: /عقد آخر/ }));
+      await user.type(screen.getByRole('textbox', { name: 'نوع العقد' }), 'عقد توريد');
+      await user.type(screen.getByLabelText('وصف الصفقة'), 'توريد معدات مكتبية على دفعات');
+    }
+
+    it('يعرض ملاحظة الخصوصية، ويرسل للمسار المساعد بلا حقل type', async () => {
+      setAuthSession(SESSION);
+      mockedGenCustom.mockResolvedValueOnce(CUSTOM_RESULT);
+      const user = userEvent.setup();
+      render(<ContractDraftingScreen />);
+      await openCustom(user);
+      expect(screen.getByText(/لا تُرسل للنموذج أبداً/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+      await waitFor(() => expect(mockedGenCustom).toHaveBeenCalledTimes(1));
+      expect(mockedGenerate).not.toHaveBeenCalled();
+      expect(mockedGenCustom).toHaveBeenCalledWith({ role: 'first', answers: { contract_type_name: 'عقد توريد', purpose: 'توريد معدات مكتبية على دفعات' } });
+      expect(await screen.findByText(/صاغها نموذج لغوى — تحتاج مراجعة محامٍ متخصص/)).toBeInTheDocument();
+      expect(screen.getByText(/يوجد 1 فراغ/)).toBeInTheDocument();
+    });
+
+    it('تحرير النص ثم التنزيل يرسل النص المعدَّل ويحدّث عدد الفراغات', async () => {
+      setAuthSession(SESSION);
+      mockedGenCustom.mockResolvedValueOnce(CUSTOM_RESULT);
+      mockedDownloadCustom.mockResolvedValueOnce(undefined);
+      const user = userEvent.setup();
+      render(<ContractDraftingScreen />);
+      await openCustom(user);
+      await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+      await user.click(await screen.findByRole('button', { name: 'تحرير نص البنود' }));
+      const box = screen.getByLabelText('البند الأول — فقرة 1');
+      await user.clear(box);
+      await user.type(box, 'يسدد الطرف الثانى الثمن خلال ثلاثين يوماً.');
+      expect(screen.getByText(/لا فراغات متبقية/)).toBeInTheDocument();
+      expect(screen.getByText(/نتيجة الفحص أدناه للنص الأصلى/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /تنزيل Word/ }));
+      expect(mockedDownloadCustom).toHaveBeenCalledTimes(1);
+      const [sent, fmt] = mockedDownloadCustom.mock.calls[0];
+      expect(fmt).toBe('docx');
+      expect(sent.clauses[0].paragraphs[0]).toBe('يسدد الطرف الثانى الثمن خلال ثلاثين يوماً.');
+      expect(sent.clauses[1].paragraphs[0]).toBe(CUSTOM_RESULT.clauses[1].paragraphs[0]);
+      expect(mockedDownload).not.toHaveBeenCalled();
+    });
+
+    it('خدمة الصياغة غير مفعّلة (503) تظهر برسالة الخادم ويبقى النموذج', async () => {
+      setAuthSession(SESSION);
+      mockedGenCustom.mockRejectedValueOnce(new ApiError(503, 'الصياغة المساعدة لعقد آخر غير مفعّلة حالياً على الخادم.'));
+      const user = userEvent.setup();
+      render(<ContractDraftingScreen />);
+      await openCustom(user);
+      await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('غير مفعّلة حالياً');
+      expect(screen.getByRole('textbox', { name: 'نوع العقد' })).toHaveValue('عقد توريد');
+    });
+
+    it('النوع الجاهز لا يعرض أدوات التحرير ولا ملاحظة النموذج اللغوى', async () => {
+      setAuthSession(SESSION);
+      mockedGenerate.mockResolvedValueOnce(RESULT);
+      const user = userEvent.setup();
+      render(<ContractDraftingScreen />);
+      await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+      await fillMinimum(user);
+      await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
+      await screen.findByRole('heading', { name: 'اتفاقية سرية وعدم إفصاح' });
+      expect(screen.queryByRole('button', { name: 'تحرير نص البنود' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/صاغها نموذج لغوى/)).not.toBeInTheDocument();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { ApiError, DraftFieldError, downloadDraft, fetchDraftTypes, generateDraft } from './api-client';
+import { ApiError, DraftFieldError, downloadCustomDraft, downloadDraft, fetchDraftTypes, generateCustomDraft, generateDraft } from './api-client';
 import { clearAuthSession, setAuthSession } from './auth';
 
 const REQ = { type: 'nda', role: 'discloser', answers: { purpose: 'تقييم' } };
@@ -109,6 +109,51 @@ describe('drafting api', () => {
     it('400 يمرر field_errors', async () => {
       mockFetch(400, { field_errors: { a: 'خطأ' } });
       await expect(downloadDraft(REQ, 'docx')).rejects.toBeInstanceOf(DraftFieldError);
+    });
+  });
+
+  describe('custom (عقد آخر)', () => {
+    it('generateCustomDraft: POST على المسار المساعد بلا type', async () => {
+      const fn = mockFetch(200, { title: 'ت', assisted: true });
+      await expect(generateCustomDraft({ role: 'first', answers: { purpose: 'x' } })).resolves.toMatchObject({ assisted: true });
+      const [url, init] = fn.mock.calls[0];
+      expect(String(url)).toMatch(/\/drafting\/custom\/generate$/);
+      expect(JSON.parse(init.body)).toEqual({ role: 'first', answers: { purpose: 'x' } });
+    });
+
+    it('رسائل الخادم لـ422 و503 تُعرض كما هى، و400 بـfield_errors تُمرَّر', async () => {
+      mockFetch(503, { message: 'الصياغة المساعدة لعقد آخر غير مفعّلة حالياً على الخادم.' });
+      await expect(generateCustomDraft({ role: 'first', answers: {} })).rejects.toMatchObject({ status: 503, message: expect.stringContaining('غير مفعّلة') });
+      mockFetch(422, { message: 'تعذّرت صياغة بنود آمنة لهذا الوصف.' });
+      await expect(generateCustomDraft({ role: 'first', answers: {} })).rejects.toMatchObject({ status: 422, message: expect.stringContaining('تعذّرت صياغة') });
+      mockFetch(400, { message: 'x', field_errors: { purpose: 'بيانات شخصية' } });
+      await expect(generateCustomDraft({ role: 'first', answers: {} })).rejects.toBeInstanceOf(DraftFieldError);
+    });
+
+    it('downloadCustomDraft: يرسل المسودة المعدَّلة داخل draft ويطلق التنزيل', async () => {
+      const click = jest.fn();
+      (URL as unknown as { createObjectURL: unknown }).createObjectURL = jest.fn(() => 'blob:x');
+      (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = jest.fn();
+      const orig = document.createElement.bind(document);
+      jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        const el = orig(tag);
+        if (tag === 'a') el.click = click;
+        return el;
+      });
+      const fn = mockFetch(200, null, { blob: async () => new Blob(['x']), headers: { get: () => 'attachment; filename="contract-draft-custom-20261118.docx"' } });
+      await downloadCustomDraft({ title: 'ع' } as never, 'docx');
+      const [url, init] = fn.mock.calls[0];
+      expect(String(url)).toMatch(/\/drafting\/custom\/export\?format=docx$/);
+      expect(JSON.parse(init.body)).toEqual({ draft: { title: 'ع' } });
+      expect(click).toHaveBeenCalledTimes(1);
+      jest.restoreAllMocks();
+    });
+
+    it('400 برسالة الخادم وPDF 503 ببديل Word', async () => {
+      mockFetch(400, { message: 'البنود: من 1 إلى 40' });
+      await expect(downloadCustomDraft({} as never, 'docx')).rejects.toMatchObject({ status: 400, message: expect.stringContaining('البنود: من 1 إلى 40') });
+      mockFetch(503, {});
+      await expect(downloadCustomDraft({} as never, 'pdf')).rejects.toMatchObject({ message: expect.stringContaining('Word') });
     });
   });
 });

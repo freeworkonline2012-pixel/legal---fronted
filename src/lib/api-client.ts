@@ -828,8 +828,11 @@ async function draftFailure(res: Response, what: string): Promise<ApiError> {
       for (const [k, v] of Object.entries(fe as Record<string, unknown>)) if (typeof v === 'string') clean[k] = v;
       return new DraftFieldError('بعض الإجابات تحتاج تصحيحاً — راجع الحقول المعلَّمة.', clean);
     }
+    if (typeof body.message === 'string' && body.message.length > 0 && body.message.length < 200) return new ApiError(400, `بعض المدخلات غير صالحة: ${body.message}`);
     return new ApiError(400, 'بعض المدخلات غير صالحة — راجع الحقول وحاول مجدداً.');
   }
+  // رسائل الخادم لحالتى 422/503 عربية مصاغة عندنا (لا نص مستخدم): تُعرض كما هى
+  if ((res.status === 422 || res.status === 503) && typeof body.message === 'string' && body.message.length > 0 && body.message.length < 300) return new ApiError(res.status, body.message);
   if (res.status === 503) return new ApiError(503, 'الخدمة غير متاحة مؤقتاً — حاول بعد قليل.');
   return new ApiError(res.status, `تعذّر ${what} (HTTP ${res.status}) — حاول مرة أخرى.`);
 }
@@ -881,6 +884,57 @@ export async function downloadDraft(payload: DraftRequest, format: 'pdf' | 'docx
     const err = await draftFailure(res, 'تنزيل المسودة');
     if (res.status === 503 && format === 'pdf') throw new ApiError(503, 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.');
     throw err;
+  }
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? `contract-draft.${format}`;
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
+
+/** POST /api/drafting/custom/generate — «عقد آخر»: هيكل ثابت + بنود صاغها نموذج لغوى بعد فحصها. 400 field_errors، 422 تعذّرت صياغة آمنة، 503 غير مفعّل. */
+export async function generateCustomDraft(payload: { role: string; answers: Record<string, string> }): Promise<DraftResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/drafting/custom/generate`, {
+      method: 'POST',
+      headers: draftHeaders(),
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await draftFailure(res, 'إعداد المسودة');
+  return (await res.json()) as DraftResult;
+}
+
+/** POST /api/drafting/custom/export?format — ينزّل «عقد آخر» من النص كما حرّره المستخدم (لا يُخزَّن شىء). */
+export async function downloadCustomDraft(draft: DraftResult, format: 'pdf' | 'docx'): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/drafting/custom/export?format=${format}`, {
+      method: 'POST',
+      headers: draftHeaders(),
+      body: JSON.stringify({ draft }),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (!res.ok) {
+    if (res.status === 503 && format === 'pdf') throw new ApiError(503, 'تنزيل PDF غير متاح مؤقتاً — يمكنك تنزيل نسخة Word الآن.');
+    throw await draftFailure(res, 'تنزيل المسودة');
   }
   const blob = await res.blob();
   const filename = parseDownloadFilename(res.headers.get('Content-Disposition')) ?? `contract-draft.${format}`;

@@ -1,6 +1,9 @@
 import {
   type DraftTypeSpec,
   buildAnswers,
+  countBlanks,
+  withClauseTitle,
+  withParagraph,
   groupFields,
   initialAnswers,
   isFieldVisible,
@@ -58,5 +61,28 @@ describe('drafting helpers', () => {
     ];
     expect(sortFindings(src).map((f) => f.title)).toEqual(['ح', 'م', 'ل']);
     expect(src[0].title).toBe('ل');
+  });
+});
+
+describe('تحرير مسودة «عقد آخر»', () => {
+  const draft = {
+    typeId: 'custom', typeLabel: 'ع', title: 'ع', role: 'first',
+    preamble: ['ديباجة [____]'], closing: ['توقيع'], lawyerNotes: [], fullText: '',
+    quality: { passed: true, checked: [], findings: [] },
+    clauses: [
+      { number: 1, heading: 'البند الأول', title: 'أ', paragraphs: ['ف1 [____]', 'ف2'] },
+      { number: 2, heading: 'البند الثانى', title: 'ب', paragraphs: ['ف3'] },
+    ],
+  };
+  it('withParagraph/withClauseTitle لا يمسّان الأصل', () => {
+    const d2 = withParagraph(draft, 0, 1, 'جديدة');
+    expect(d2.clauses[0].paragraphs).toEqual(['ف1 [____]', 'جديدة']);
+    expect(draft.clauses[0].paragraphs[1]).toBe('ف2');
+    expect(withClauseTitle(draft, 1, 'ج').clauses[1].title).toBe('ج');
+    expect(draft.clauses[1].title).toBe('ب');
+  });
+  it('countBlanks يعد [____] فى الديباجة والبنود', () => {
+    expect(countBlanks(draft)).toBe(2);
+    expect(countBlanks(withParagraph(draft, 0, 0, 'ملأتها'))).toBe(1);
   });
 });

@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileDown, FilePenLine, LogIn, RefreshCw, WifiOff } from 'lucide-react';
-import { ApiError, DraftFieldError, downloadDraft, fetchDraftTypes, generateDraft } from '@/lib/api-client';
+import { ApiError, DraftFieldError, downloadCustomDraft, downloadDraft, fetchDraftTypes, generateCustomDraft, generateDraft } from '@/lib/api-client';
 import { isAuthenticated } from '@/lib/auth';
 import {
   type DraftAnswers,
@@ -21,11 +21,14 @@ import {
   type DraftResult,
   type DraftTypeSpec,
   buildAnswers,
+  countBlanks,
   groupFields,
   initialAnswers,
   missingRequired,
   sortFindings,
   visibleFields,
+  withClauseTitle,
+  withParagraph,
 } from '@/lib/drafting';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { TextArea } from '@/components/ui/TextArea';
@@ -124,6 +127,9 @@ export function ContractDraftingScreen() {
   const [downloading, setDownloading] = useState<'pdf' | 'docx' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<DraftResult | null>(null);
+  // «عقد آخر»: النص قابل للتحرير قبل التنزيل؛ `edited` هو ما يُنزَّل
+  const [edited, setEdited] = useState<DraftResult | null>(null);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     // متعمّد: sessionStorage متاح للعميل فقط (نفس نمط بقية الشاشات)
@@ -158,6 +164,8 @@ export function ContractDraftingScreen() {
     setFieldErrors({});
     setMessage(null);
     setResult(null);
+    setEdited(null);
+    setEditing(false);
   }
 
   function setAnswer(id: string, value: string) {
@@ -177,8 +185,11 @@ export function ContractDraftingScreen() {
     }
     setBusy(true);
     try {
-      const draft = await generateDraft({ type: spec.id, role, answers: buildAnswers(spec, answers) });
+      const clean = buildAnswers(spec, answers);
+      const draft = spec.assisted ? await generateCustomDraft({ role, answers: clean }) : await generateDraft({ type: spec.id, role, answers: clean });
       setResult(draft);
+      setEdited(draft);
+      setEditing(false);
     } catch (err) {
       if (err instanceof DraftFieldError) setFieldErrors(err.fieldErrors);
       setMessage(err instanceof ApiError ? err.message : 'حدث خطأ غير متوقّع — حاول مرة أخرى.');
@@ -192,7 +203,8 @@ export function ContractDraftingScreen() {
     setDownloading(format);
     setMessage(null);
     try {
-      await downloadDraft({ type: spec.id, role, answers: buildAnswers(spec, answers) }, format);
+      if (spec.assisted) await downloadCustomDraft(edited ?? result!, format);
+      else await downloadDraft({ type: spec.id, role, answers: buildAnswers(spec, answers) }, format);
     } catch (err) {
       setMessage(err instanceof ApiError ? err.message : 'تعذّر تنزيل المسودة — حاول مرة أخرى.');
     } finally {
@@ -202,11 +214,15 @@ export function ContractDraftingScreen() {
 
   function backToForm() {
     setResult(null);
+    setEdited(null);
+    setEditing(false);
     setMessage(null);
   }
 
   function startOver() {
     setResult(null);
+    setEdited(null);
+    setEditing(false);
     setTypeId(null);
     setAnswers({});
     setFieldErrors({});
@@ -214,6 +230,8 @@ export function ContractDraftingScreen() {
   }
 
   const groups = spec ? groupFields(visibleFields(spec, answers)) : [];
+  const shown = edited ?? result;
+  const blanks = shown ? countBlanks(shown) : 0;
 
   return (
     <main className="mx-auto w-full max-w-[860px] flex-1 px-4 pb-28 pt-6 sm:px-8 lg:pb-10">
@@ -301,6 +319,11 @@ export function ContractDraftingScreen() {
               </section>
 
               <h2 className="text-body font-semibold text-text-primary">٣. بيانات العقد</h2>
+              {spec.assisted ? (
+                <p role="note" className="rounded-lg border border-border-default bg-surface px-4 py-3 text-body-sm text-text-secondary">
+                  بنود موضوع هذا العقد يصوغها نموذج لغوى من وصفك. أسماء الأطراف وعناوينهم وممثلوهم لا تُرسل للنموذج أبداً، وأى رقم قومى أو هاتف أو حساب بنكى فى وصفك يوقف الطلب. النموذج لا يضيف أى رقم أو مبلغ أو مدة من عنده: ما لم تكتبه فى «الأرقام والشروط الجوهرية» يظهر فراغاً [____] لتملأه، ولا يستشهد بأى مادة قانونية. قد تستغرق الصياغة نحو نصف دقيقة.
+                </p>
+              ) : null}
               {groups.map((g) => (
                 <fieldset key={g.group} className="space-y-4 rounded-lg border border-border-default bg-surface p-4" disabled={busy}>
                   <legend className="px-2 text-body-sm font-semibold text-text-primary">{g.group}</legend>
@@ -330,6 +353,11 @@ export function ContractDraftingScreen() {
                 <Button type="submit" loading={busy} disabled={busy}>
                   جهّز المسودة
                 </Button>
+                {busy && spec.assisted ? (
+                  <span role="status" className="text-body-sm text-text-secondary">
+                    جارٍ صياغة البنود وفحصها… قد يستغرق نحو نصف دقيقة.
+                  </span>
+                ) : null}
                 <Button type="button" variant="ghost" onClick={startOver} disabled={busy}>
                   تغيير نوع العقد
                 </Button>
@@ -337,34 +365,50 @@ export function ContractDraftingScreen() {
             </form>
           ) : null}
 
-          {result ? (
+          {shown ? (
             <section aria-label="المسودة" className="space-y-6">
               <header className="space-y-1">
-                <h2 className="text-h3 font-bold text-text-primary">{result.title}</h2>
-                <p className="text-body-sm text-text-secondary">{result.typeLabel} — مسودة تحتاج مراجعة محامٍ</p>
+                <h2 className="text-h3 font-bold text-text-primary">{shown.title}</h2>
+                <p className="text-body-sm text-text-secondary">{shown.typeLabel} — مسودة تحتاج مراجعة محامٍ</p>
               </header>
+
+              {shown.assisted ? (
+                <div role="note" className="space-y-1 rounded-lg border border-warning bg-warning-soft p-4 text-body-sm text-text-primary">
+                  <p className="font-semibold">بنود موضوع العقد صاغها نموذج لغوى — تحتاج مراجعة محامٍ متخصص.</p>
+                  <p className="text-text-secondary">
+                    فُحصت آلياً (لا استشهادات ولا أرقام غير واردة فى إجاباتك، ولا شروط تخالف قواعد آمرة تعرفها المنصة) لكن هذا ليس مراجعة قانونية.
+                    {blanks > 0 ? ` يوجد ${blanks} فراغ [____] ينتظر أن تملأه أو تحذفه قبل التوقيع.` : ' لا فراغات متبقية.'}
+                  </p>
+                </div>
+              ) : null}
+
+              {shown.assisted && result && edited && JSON.stringify(edited.clauses) !== JSON.stringify(result.clauses) ? (
+                <p role="note" className="text-body-sm text-text-secondary">
+                  عدّلت النص: نتيجة الفحص أدناه للنص الأصلى قبل تعديلك؛ يُعاد فحص النص المعدَّل عند التنزيل.
+                </p>
+              ) : null}
 
               <div
                 role="status"
                 className={`flex items-start gap-3 rounded-lg border p-4 text-body-sm ${
-                  result.quality.passed ? 'border-success bg-success-soft text-text-primary' : 'border-warning bg-warning-soft text-text-primary'
+                  shown.quality.passed ? 'border-success bg-success-soft text-text-primary' : 'border-warning bg-warning-soft text-text-primary'
                 }`}
               >
-                {result.quality.passed ? (
+                {shown.quality.passed ? (
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                 ) : (
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
                 )}
                 <div className="space-y-2">
                   <p className="font-semibold">
-                    {result.quality.passed
+                    {shown.quality.passed
                       ? 'اجتازت المسودة فحص الجودة الآلى بلا ملاحظات.'
-                      : `فحص الجودة الآلى سجّل ${result.quality.findings.length} ملاحظة تستوجب انتباهك.`}
+                      : `فحص الجودة الآلى سجّل ${shown.quality.findings.length} ملاحظة تستوجب انتباهك.`}
                   </p>
                   <p className="text-text-secondary">الفحص آلى ولا يغنى عن مراجعة المحامى.</p>
-                  {result.quality.findings.length > 0 ? (
+                  {shown.quality.findings.length > 0 ? (
                     <ul className="list-disc space-y-1 ps-5">
-                      {sortFindings(result.quality.findings).map((f, i) => (
+                      {sortFindings(shown.quality.findings).map((f, i) => (
                         <li key={i}>
                           <strong>
                             [{f.severity}] {f.title}
@@ -378,16 +422,34 @@ export function ContractDraftingScreen() {
               </div>
 
               <article aria-label="نص العقد" className="space-y-4 rounded-lg border border-border-default bg-surface p-5 text-body leading-8 text-text-primary">
-                {result.preamble.map((p, i) => (
+                {shown.preamble.map((p, i) => (
                   <p key={`pre-${i}`}>{p}</p>
                 ))}
-                {result.clauses.map((c) => (
+                {shown.clauses.map((c, ci) => (
                   <section key={c.number} aria-label={c.heading} className="space-y-2">
-                    <h3 className="text-body font-bold">
-                      {c.heading}: {c.title}
-                    </h3>
+                    {editing && shown.assisted ? (
+                      <TextField
+                        aria-label={`عنوان ${c.heading}`}
+                        value={c.title}
+                        maxLength={80}
+                        onChange={(e) => setEdited((prev) => (prev ? withClauseTitle(prev, ci, e.target.value) : prev))}
+                      />
+                    ) : (
+                      <h3 className="text-body font-bold">
+                        {c.heading}: {c.title}
+                      </h3>
+                    )}
                     {c.paragraphs.map((p, i) =>
-                      p.startsWith('- ') ? (
+                      editing && shown.assisted ? (
+                        <TextArea
+                          key={i}
+                          aria-label={`${c.heading} — فقرة ${i + 1}`}
+                          value={p}
+                          rows={3}
+                          maxLength={3000}
+                          onChange={(e) => setEdited((prev) => (prev ? withParagraph(prev, ci, i, e.target.value) : prev))}
+                        />
+                      ) : p.startsWith('- ') ? (
                         <p key={i} className="ps-4">
                           • {p.slice(2)}
                         </p>
@@ -397,7 +459,7 @@ export function ContractDraftingScreen() {
                     )}
                   </section>
                 ))}
-                {result.closing.map((p, i) => (
+                {shown.closing.map((p, i) => (
                   <p key={`close-${i}`}>{p}</p>
                 ))}
               </article>
@@ -405,7 +467,7 @@ export function ContractDraftingScreen() {
               <section aria-label="ملاحظات المراجعة للمحامى" className="rounded-lg border border-border-default bg-surface p-5">
                 <h3 className="mb-2 text-body font-bold text-text-primary">ملاحظات للمحامى (ليست من نص العقد)</h3>
                 <ol className="list-decimal space-y-1 ps-5 text-body-sm text-text-secondary">
-                  {result.lawyerNotes.map((n, i) => (
+                  {shown.lawyerNotes.map((n, i) => (
                     <li key={i}>{n}</li>
                   ))}
                 </ol>
@@ -432,6 +494,11 @@ export function ContractDraftingScreen() {
                   <FileDown className="h-4 w-4" aria-hidden="true" />
                   تنزيل PDF
                 </Button>
+                {shown.assisted ? (
+                  <Button type="button" variant="secondary" onClick={() => setEditing((v) => !v)} aria-pressed={editing}>
+                    {editing ? 'إنهاء تحرير النص' : 'تحرير نص البنود'}
+                  </Button>
+                ) : null}
                 <Button type="button" variant="ghost" onClick={backToForm}>
                   تعديل الإجابات
                 </Button>

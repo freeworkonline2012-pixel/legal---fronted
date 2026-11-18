@@ -29,6 +29,8 @@ export interface DraftField {
 
 export interface DraftTypeSpec {
   id: string;
+  /** true = «عقد آخر»: بنود الموضوع يصوغها نموذج لغوى على الخادم (مسار منفصل، والنص قابل للتحرير قبل التنزيل) */
+  assisted?: boolean;
   label: string;
   description: string;
   roles: DraftOption[];
@@ -50,6 +52,8 @@ export interface DraftQualityFinding {
 
 export interface DraftResult {
   typeId: string;
+  assisted?: boolean;
+  blankSlots?: number;
   typeLabel: string;
   title: string;
   role: string;
@@ -128,4 +132,22 @@ const SEVERITY_ORDER = ['حرج', 'عالٍ', 'متوسط', 'منخفض'];
 
 export function sortFindings(findings: DraftQualityFinding[]): DraftQualityFinding[] {
   return [...findings].sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+}
+
+/** نسخة من المسودة بفقرة بند معدَّلة (لا تمس الأصل). */
+export function withParagraph(draft: DraftResult, clauseIndex: number, paragraphIndex: number, text: string): DraftResult {
+  return {
+    ...draft,
+    clauses: draft.clauses.map((c, i) => (i !== clauseIndex ? c : { ...c, paragraphs: c.paragraphs.map((p, j) => (j === paragraphIndex ? text : p)) })),
+  };
+}
+
+export function withClauseTitle(draft: DraftResult, clauseIndex: number, title: string): DraftResult {
+  return { ...draft, clauses: draft.clauses.map((c, i) => (i === clauseIndex ? { ...c, title } : c)) };
+}
+
+/** عدد الفراغات [____] فى النص الحالى (يتحدث أثناء ملء المستخدم لها). */
+export function countBlanks(draft: DraftResult): number {
+  const all = [...draft.preamble, ...draft.clauses.flatMap((c) => c.paragraphs), ...draft.closing].join('\n');
+  return (all.match(/\[____\]/g) ?? []).length;
 }
