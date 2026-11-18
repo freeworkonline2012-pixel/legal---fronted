@@ -80,7 +80,7 @@ const DOCX = new File(['x'], 'contract.docx', { type: 'application/vnd.openxmlfo
 
 async function startFlow(user: ReturnType<typeof userEvent.setup>) {
   await user.upload(await screen.findByLabelText(/ملف العقد/), DOCX);
-  await user.click(screen.getByRole('checkbox'));
+  await user.click(screen.getByLabelText(/أوافق على إرسال/));
   await user.click(screen.getByRole('button', { name: 'ابدأ الترجمة' }));
 }
 
@@ -129,7 +129,7 @@ describe('TranslationScreen', () => {
     render(<TranslationScreen />);
     await startFlow(user);
 
-    expect(mCreate).toHaveBeenCalledWith(DOCX, 'en', true, true);
+    expect(mCreate).toHaveBeenCalledWith(DOCX, 'en', true, true, false);
     expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
     expect(mStep).toHaveBeenCalledTimes(2);
     expect(window.sessionStorage.getItem(ACTIVE_TRANSLATION_KEY)).toBe('t-1');
@@ -145,6 +145,70 @@ describe('TranslationScreen', () => {
     expect(mDownload).toHaveBeenLastCalledWith('t-1', 'pdf', 'bilingual');
   });
 
+  it('خيار الاحتفاظ بتنسيق Word يظهر لملف docx فقط ويُرسَل للخادم عند تفعيله، مع إفصاح التخزين المؤقت', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup({ applyAccept: false });
+    mCreate.mockResolvedValue(job({ original_layout: true }));
+    mStep.mockResolvedValue({ ...DONE, original_layout: true });
+    render(<TranslationScreen />);
+    const input = await screen.findByLabelText(/ملف العقد/);
+    expect(screen.queryByLabelText(/احتفظ بتنسيق ملف Word/)).not.toBeInTheDocument();
+    await user.upload(input, new File(['x'], 'scan.pdf', { type: 'application/pdf' }));
+    expect(screen.queryByLabelText(/احتفظ بتنسيق ملف Word/)).not.toBeInTheDocument();
+    await user.upload(input, DOCX);
+    const box = await screen.findByLabelText(/احتفظ بتنسيق ملف Word/);
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(/نحفظ ملفك الأصلى مشفَّراً ومؤقتاً/)).toBeInTheDocument();
+    await user.click(box);
+    await user.click(screen.getByLabelText(/أوافق على إرسال/));
+    await user.click(screen.getByRole('button', { name: 'ابدأ الترجمة' }));
+    expect(mCreate).toHaveBeenCalledWith(DOCX, 'en', true, true, true);
+  });
+
+  it('تبديل الملف إلى غير docx يلغى الاحتفاظ بالتنسيق فلا يُرسَل', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup({ applyAccept: false });
+    mCreate.mockResolvedValue(job());
+    mStep.mockResolvedValue(DONE);
+    render(<TranslationScreen />);
+    const input = await screen.findByLabelText(/ملف العقد/);
+    await user.upload(input, DOCX);
+    await user.click(await screen.findByLabelText(/احتفظ بتنسيق ملف Word/));
+    const pdf = new File(['x'], 'scan.pdf', { type: 'application/pdf' });
+    await user.upload(input, pdf);
+    await user.upload(input, DOCX);
+    expect(await screen.findByLabelText(/احتفظ بتنسيق ملف Word/)).not.toBeChecked();
+  });
+
+  it('مهمة محفوظة بتنسيق الأصل: خيار «بتنسيق ملف Word الأصلى» مفعّل افتراضياً، يُنزَّل Word بـoriginal، وPDF معطّل', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup();
+    mCreate.mockResolvedValue(job({ original_layout: true }));
+    mStep.mockResolvedValue({ ...DONE, original_layout: true });
+    mDownload.mockResolvedValue(undefined);
+    render(<TranslationScreen />);
+    await startFlow(user);
+    expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+    expect(screen.getByLabelText(/بتنسيق ملف Word الأصلى \(Word فقط\)/)).toBeChecked();
+    expect(screen.getByRole('button', { name: /تنزيل PDF/ })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /تنزيل Word/ }));
+    expect(mDownload).toHaveBeenCalledWith('t-1', 'docx', 'original');
+    await user.click(screen.getByLabelText(/الترجمة فقط/));
+    expect(screen.getByRole('button', { name: /تنزيل PDF/ })).toBeEnabled();
+  });
+
+  it('مهمة عادية (بلا original_layout): لا يظهر خيار تنسيق الأصل', async () => {
+    setAuthSession(SESSION);
+    const user = userEvent.setup();
+    mCreate.mockResolvedValue(job());
+    mStep.mockResolvedValue(DONE);
+    render(<TranslationScreen />);
+    await startFlow(user);
+    expect(await screen.findByLabelText('الترجمة جاهزة')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/بتنسيق ملف Word الأصلى/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/الترجمة فقط/)).toBeChecked();
+  });
+
   it('يرسل لغة الهدف المختارة', async () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
@@ -153,7 +217,7 @@ describe('TranslationScreen', () => {
     render(<TranslationScreen />);
     await user.selectOptions(await screen.findByLabelText('الترجمة إلى'), 'ar');
     await startFlow(user);
-    expect(mCreate).toHaveBeenCalledWith(DOCX, 'ar', true, true);
+    expect(mCreate).toHaveBeenCalledWith(DOCX, 'ar', true, true, false);
   });
 
   it('خطأ الإنشاء (422) يُعرض ويبقى النموذج', async () => {

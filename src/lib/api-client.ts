@@ -6,6 +6,7 @@
  * المصادقة (H-2): يُرفَق Authorization: Bearer تلقائياً عند وجود جلسة (src/lib/auth.ts).
  */
 
+import type { OfficePlaybookView, PlaybookConfig, PlaybookPayload } from '@/lib/office-playbook';
 import type {
   ArticleDetail,
   ArticleListResponse,
@@ -820,12 +821,15 @@ export async function createTranslation(
   targetLang: TranslationLang,
   consent: boolean,
   background = false,
+  preserveFormat = false,
 ): Promise<TranslationJob> {
   const form = new FormData();
   form.append('target_lang', targetLang);
   form.append('consent', consent ? 'true' : 'false');
   // اختيارى: يكمل الخادم الترجمة بنفسه (خادم قديم يتجاهل الحقل فيقود العميل الخطوات)
   if (background) form.append('background', 'true');
+  // اختيارى (ملفات Word فقط): يحفظ الخادم الملف الأصلى مشفَّراً مؤقتاً ليكتب الترجمة داخله بتنسيقه
+  if (preserveFormat) form.append('preserve_format', 'true');
   form.append('file', file);
   // لا نضع Content-Type: المتصفح يضبط حدود multipart بنفسه.
   const res = await translationFetch('', { method: 'POST', body: form }, 'تعذّر بدء الترجمة');
@@ -1067,4 +1071,54 @@ export async function downloadCustomDraft(draft: DraftResult, format: 'pdf' | 'd
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
+}
+
+// ========================= Playbook المكتب =========================
+
+async function playbookFetch(init: RequestInit, fallback: string): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/office-playbook`, {
+      ...init,
+      headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'تعذّر الاتصال بالخادم — تحقق من اتصالك وحاول مرة أخرى.');
+  }
+  if (res.ok) return res;
+  if (res.status === 401) throw new ApiError(401, 'سجّل الدخول أولاً لإدارة قواعد المكتب.');
+  if (res.status === 429) throw new ApiError(429, 'طلبات كثيرة خلال وقت قصير — انتظر قليلاً ثم حاول مجدداً.');
+  if (res.status === 400) {
+    // رسائل التحقق من الخادم (قائمة أخطاء بالعربية) تُعرض كما هى
+    try {
+      const body = (await res.json()) as { message?: unknown; errors?: unknown };
+      const errors = Array.isArray(body.errors) ? body.errors.filter((e): e is string => typeof e === 'string') : [];
+      if (errors.length > 0) throw new ApiError(400, errors.join('\n'));
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+    }
+  }
+  throw new ApiError(res.status, `${fallback} (HTTP ${res.status}).`);
+}
+
+/** GET /api/office-playbook — إعداد مكتبى الحالى + كتالوج القواعد الافتراضية + الحدود. */
+export async function fetchOfficePlaybook(): Promise<OfficePlaybookView> {
+  const res = await playbookFetch({}, 'تعذّر جلب قواعد المكتب');
+  return (await res.json()) as OfficePlaybookView;
+}
+
+/** PUT /api/office-playbook — يحفظ الإعداد (400: رسائل التحقق من الخادم). */
+export async function saveOfficePlaybook(config: PlaybookConfig | PlaybookPayload): Promise<OfficePlaybookView> {
+  const res = await playbookFetch(
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) },
+    'تعذّر حفظ قواعد المكتب',
+  );
+  return (await res.json()) as OfficePlaybookView;
+}
+
+/** DELETE /api/office-playbook — إعادة الضبط إلى القواعد الافتراضية. */
+export async function resetOfficePlaybook(): Promise<OfficePlaybookView> {
+  const res = await playbookFetch({ method: 'DELETE' }, 'تعذّرت إعادة الضبط');
+  return (await res.json()) as OfficePlaybookView;
 }

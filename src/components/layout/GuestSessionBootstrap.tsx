@@ -31,7 +31,7 @@ import { hasStoredGuestConsent, isGuestUser, storeGuestConsent } from '@/lib/gue
 type Phase = 'idle' | 'prompt' | 'starting' | 'error';
 
 /** الصفحات التى لا تُعرض فيها البطاقة (المستخدم يدخل بحسابه هناك) */
-const HIDDEN_PATH_PREFIXES = ['/login'];
+const HIDDEN_PATH_PREFIXES = ['/login', '/word-addin'];
 
 export function GuestSessionBootstrap() {
   const [phase, setPhase] = useState<Phase>('idle');

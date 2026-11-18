@@ -48,6 +48,16 @@ describe('translation api client', () => {
     expect(form.get('file')).toBeInstanceOf(File);
   });
 
+  it('createTranslation: preserve_format يُرسَل فقط عند طلبه، وlayout=original يُمرَّر للتنزيل', async () => {
+    let fn = mockFetch(201, { id: 't1' });
+    await createTranslation(FILE, 'en', true, true, true);
+    expect((fn.mock.calls[0][1].body as FormData).get('preserve_format')).toBe('true');
+    expect((fn.mock.calls[0][1].body as FormData).get('background')).toBe('true');
+    fn = mockFetch(201, { id: 't1' });
+    await createTranslation(FILE, 'en', true, true);
+    expect((fn.mock.calls[0][1].body as FormData).has('preserve_format')).toBe(false);
+  });
+
   it('createTranslation: 422 يُظهر رسالة الخادم و401/429/413 رسائل عربية ثابتة', async () => {
     mockFetch(422, { message: 'العقد مكتوب أصلاً بالعربية' });
     await expect(createTranslation(FILE, 'ar', true)).rejects.toMatchObject({ status: 422, message: 'العقد مكتوب أصلاً بالعربية' });
@@ -110,6 +120,8 @@ describe('translation api client', () => {
     await downloadTranslation('t1', 'docx', 'bilingual');
     expect(String(fn.mock.calls[0][0])).toMatch(/\/translations\/t1\/download\?format=docx&layout=bilingual$/);
     expect(click).toHaveBeenCalled();
+    await downloadTranslation('t1', 'docx', 'original');
+    expect(String(fn.mock.calls[1][0])).toMatch(/\/translations\/t1\/download\?format=docx&layout=original$/);
     click.mockRestore();
   });
 

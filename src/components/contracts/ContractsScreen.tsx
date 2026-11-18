@@ -257,6 +257,11 @@ export function ContractsScreen() {
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <ScrollText className="h-10 w-10 text-primary" aria-hidden="true" />
         <h1 className="text-h2 font-bold text-text-primary">مراجعة العقود</h1>
+        {authed === true ? (
+          <ButtonLink href="/office-playbook" variant="link" size="sm">
+            قواعد مكتبك: تعطيل وتخصيص قواعد التدقيق
+          </ButtonLink>
+        ) : null}
       </div>
 
       {authed === false ? (

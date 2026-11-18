@@ -88,6 +88,7 @@ export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: numbe
   const [fileError, setFileError] = useState<string | undefined>(undefined);
   const [target, setTarget] = useState<TranslationLang>('en');
   const [consent, setConsent] = useState(false);
+  const [preserveFormat, setPreserveFormat] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mine, setMine] = useState<TranslationListItem[]>([]);
 
@@ -97,6 +98,7 @@ export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: numbe
   const fileId = useId();
   const targetId = useId();
   const consentId = useId();
+  const preserveId = useId();
 
   useEffect(() => {
     aliveRef.current = true;
@@ -235,6 +237,7 @@ export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: numbe
     const problem = validateTranslationFile(selected);
     setFileError(problem);
     setFile(problem ? null : selected);
+    if (problem || !isDocx(selected)) setPreserveFormat(false);
   }
 
   async function handleStart() {
@@ -242,7 +245,7 @@ export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: numbe
     setPhase('creating');
     setError(null);
     try {
-      const created = await createTranslation(file, target, true, true);
+      const created = await createTranslation(file, target, true, true, isDocx(file) && preserveFormat);
       rememberActive(created.id);
       setJob(created);
       // خادم جديد: يكمل بنفسه ونتابع. خادم قديم (بلا حقل background) أو طابور ممتلئ: نقود الخطوات كما كان.
@@ -415,6 +418,27 @@ export function TranslationScreen({ pollMs = DEFAULT_POLL_MS }: { pollMs?: numbe
             </p>
           </div>
 
+          {file && isDocx(file) ? (
+            <div className="space-y-1">
+              <div className="flex items-start gap-2">
+                <input
+                  id={preserveId}
+                  type="checkbox"
+                  checked={preserveFormat}
+                  onChange={(event) => setPreserveFormat(event.target.checked)}
+                  disabled={phase === 'creating'}
+                  className="mt-1 h-4 w-4"
+                />
+                <label htmlFor={preserveId} className="text-body-sm text-text-primary">
+                  احتفظ بتنسيق ملف Word الأصلى (الجداول والترقيم والترويسة)
+                </label>
+              </div>
+              <p className="text-caption text-text-tertiary">
+                عند التفعيل نحفظ ملفك الأصلى مشفَّراً ومؤقتاً مع الترجمة لنكتب الترجمة داخله، ويُحذف معها (تلقائياً أو بزر «احذف الآن»). تنسيق الكلمات داخل الفقرة يتوحّد، والفقرات التى فيها حقول (فهرس/أرقام صفحات) لا تُترجَم.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex items-start gap-2">
             <input
               id={consentId}
@@ -533,8 +557,13 @@ interface CompletedViewProps {
   deleteError: string | null;
 }
 
+/** ملف Word (docx) بحسب الامتداد — الخادم يتحقق من المحتوى الفعلى */
+function isDocx(file: File): boolean {
+  return /\.docx$/i.test(file.name);
+}
+
 function CompletedView({ job, onJobChange, onDelete, onNew, deleteError }: CompletedViewProps) {
-  const [layout, setLayout] = useState<TranslationLayout>('translation');
+  const [layout, setLayout] = useState<TranslationLayout>(job.original_layout ? 'original' : 'translation');
   const [busy, setBusy] = useState<ExportFormat | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [units, setUnits] = useState<TranslationUnit[]>([]);
@@ -604,6 +633,17 @@ function CompletedView({ job, onJobChange, onDelete, onNew, deleteError }: Compl
           <p className="text-body-sm font-semibold text-text-primary">تنزيل الترجمة</p>
           <fieldset className="flex flex-wrap gap-4">
             <legend className="sr-only">شكل المستند</legend>
+            {job.original_layout ? (
+              <label className="flex items-center gap-2 text-body-sm text-text-primary">
+                <input
+                  type="radio"
+                  name="translation-layout"
+                  checked={layout === 'original'}
+                  onChange={() => setLayout('original')}
+                />
+                بتنسيق ملف Word الأصلى (Word فقط)
+              </label>
+            ) : null}
             <label className="flex items-center gap-2 text-body-sm text-text-primary">
               <input
                 type="radio"
@@ -633,12 +673,17 @@ function CompletedView({ job, onJobChange, onDelete, onNew, deleteError }: Compl
               variant="secondary"
               onClick={() => void handleDownload('pdf')}
               loading={busy === 'pdf'}
-              disabled={busy !== null}
+              disabled={busy !== null || layout === 'original'}
             >
               <FileDown className="h-4 w-4" aria-hidden="true" />
               تنزيل PDF
             </Button>
           </div>
+          {layout === 'original' ? (
+            <p className="text-caption text-text-tertiary">
+              التنزيل بتنسيق الأصل متاح بصيغة Word فقط. افتح الملف فى Word وراجعه قبل الاعتماد.
+            </p>
+          ) : null}
           {downloadError ? (
             <p role="alert" className="text-body-sm text-error">
               {downloadError}

@@ -862,7 +862,8 @@ export interface AnalyzeDocumentResponse {
 
 export type TranslationLang = 'ar' | 'en';
 export type TranslationStatus = 'ready' | 'translating' | 'completed';
-export type TranslationLayout = 'translation' | 'bilingual';
+/** original = الترجمة داخل ملف Word الأصلى بتنسيقه (جداول وترقيم)؛ تتاح فقط لمهمة أُنشئت بخيار الاحتفاظ بالتنسيق */
+export type TranslationLayout = 'translation' | 'bilingual' | 'original';
 export type TranslationFlag = 'numbers_mismatch' | 'length_anomaly' | 'untranslated_text' | 'empty_translation';
 
 export interface TranslationProgress {
@@ -902,6 +903,8 @@ export interface TranslationJob {
   created_at: string;
   /** running = الخادم يكمل الترجمة بنفسه الآن؛ idle = لا مشغِّل. غيابه = خادم قديم (العميل يقود الخطوات). */
   background?: 'running' | 'idle';
+  /** true = حُفظ الملف الأصلى (Word) ويمكن تنزيل الترجمة بتنسيقه. غيابه = خادم قديم. */
+  original_layout?: boolean;
 }
 
 /** عنصر «ترجماتى»: بيانات وصفية بلا نص العقد */
