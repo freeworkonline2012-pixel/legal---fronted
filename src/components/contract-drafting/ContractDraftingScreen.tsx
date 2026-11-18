@@ -244,11 +244,6 @@ export function ContractDraftingScreen() {
         </p>
       </div>
 
-      <div role="note" className="mb-6 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-body-sm text-text-primary">
-        الناتج مسودة دائماً — «مسودة — تحتاج مراجعة محامٍ». تُصاغ من قوالب ثابتة وإجاباتك دون اطلاع على وقائع حالتك، ولا
-        تُغنى عن مراجعة محامٍ قبل التوقيع. لا نستعمل نموذجاً لغوياً ولا نرسل بياناتك لأى جهة، ولا نخزّن شيئاً من العقد.
-      </div>
-
       {authed === false ? (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-border-default bg-surface p-8 text-center">
           <LogIn className="h-8 w-8 text-text-tertiary" aria-hidden="true" />
@@ -278,24 +273,28 @@ export function ContractDraftingScreen() {
           ) : null}
 
           {typesStatus === 'ready' && !result ? (
-            <section aria-label="نوع العقد" className="mb-6">
-              <h2 className="mb-3 text-body font-semibold text-text-primary">١. اختر نوع العقد</h2>
-              <div className="grid gap-3 sm:grid-cols-3">
+            <section className="mb-6">
+              <label htmlFor="draft-type" className="mb-3 block text-body font-semibold text-text-primary">
+                ١. اختر نوع العقد
+              </label>
+              <select
+                id="draft-type"
+                value={typeId ?? ''}
+                disabled={busy}
+                onChange={(e) => {
+                  const next = types.find((t) => t.id === e.target.value);
+                  if (next) chooseType(next);
+                }}
+                className={SELECT_CLASSES}
+              >
+                {typeId === null ? <option value="">اختر نوع العقد…</option> : null}
                 {types.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-pressed={t.id === typeId}
-                    onClick={() => chooseType(t)}
-                    className={`rounded-lg border p-4 text-start transition-colors focus:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)] ${
-                      t.id === typeId ? 'border-primary bg-primary-soft' : 'border-border-default bg-surface hover:border-border-strong'
-                    }`}
-                  >
-                    <span className="block text-body font-semibold text-text-primary">{t.label}</span>
-                    <span className="mt-1 block text-body-sm text-text-secondary">{t.description}</span>
-                  </button>
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
                 ))}
-              </div>
+              </select>
+              {spec ? <p className="mt-2 text-body-sm text-text-secondary">{spec.description}</p> : null}
             </section>
           ) : null}
 

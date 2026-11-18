@@ -4,7 +4,7 @@
  * عرض أخطاء الحقول من الخادم، معاينة المسودة وفحص الجودة، التنزيل، وعدم ادعاء ما لا يقدّمه النظام.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContractDraftingScreen } from './ContractDraftingScreen';
 import { clearAuthSession, setAuthSession } from '@/lib/auth';
@@ -81,6 +81,13 @@ async function fillMinimum(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('تاريخ السريان'), '2026-12-01');
 }
 
+async function pickType(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+  const select = await screen.findByRole('combobox', { name: /اختر نوع العقد/ });
+  const option = within(select).getAllByRole('option').find((o) => name.test(o.textContent ?? ''));
+  if (!option) throw new Error(`النوع غير موجود فى القائمة: ${String(name)}`);
+  await user.selectOptions(select, option as HTMLOptionElement);
+}
+
 describe('ContractDraftingScreen', () => {
   beforeEach(() => {
     mockedTypes.mockReset();
@@ -95,7 +102,7 @@ describe('ContractDraftingScreen', () => {
   it('يعرض العنوان وتنبيه المسودة، ولا يدّعى الخدمة «قيد الإعداد»', () => {
     render(<ContractDraftingScreen />);
     expect(screen.getByRole('heading', { level: 1, name: 'صياغة العقود' })).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent('تحتاج مراجعة محامٍ');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.queryByText(/قيد الإعداد/)).not.toBeInTheDocument();
   });
 
@@ -106,12 +113,24 @@ describe('ContractDraftingScreen', () => {
     expect(mockedTypes).not.toHaveBeenCalled();
   });
 
-  it('المسجَّل: يحمّل الأنواع من الخادم ويعرضها بطاقات', async () => {
+  it('المسجَّل: يحمّل الأنواع من الخادم ويعرضها فى قائمة منسدلة', async () => {
     setAuthSession(SESSION);
     render(<ContractDraftingScreen />);
-    expect(await screen.findByRole('button', { name: /اتفاقية سرية/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /عقد إيجار/ })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /اتفاقية سرية/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /عقد إيجار/ })).toBeInTheDocument();
     expect(screen.queryByLabelText('اسم الطرف الأول')).not.toBeInTheDocument();
+  });
+
+  it('الصفحة لا تعرض أى ملاحظة صفراء، وأنواع العقود كلها فى قائمة منسدلة واحدة', async () => {
+    setAuthSession(SESSION);
+    render(<ContractDraftingScreen />);
+    const select = await screen.findByRole('combobox', { name: /اختر نوع العقد/ });
+    expect(screen.queryByText(/الناتج مسودة دائماً/)).not.toBeInTheDocument();
+    const labels = within(select)
+      .getAllByRole('option')
+      .map((o) => o.textContent);
+    expect(labels).toEqual(expect.arrayContaining(['اتفاقية سرية', 'عقد إيجار', 'عقد آخر']));
+    expect(screen.queryByRole('button', { name: /عقد إيجار/ })).not.toBeInTheDocument();
   });
 
   it('فشل تحميل الأنواع: رسالة وزر إعادة محاولة يعمل', async () => {
@@ -121,14 +140,14 @@ describe('ContractDraftingScreen', () => {
     render(<ContractDraftingScreen />);
     expect(await screen.findByRole('alert')).toHaveTextContent('تعذّر الاتصال بالخادم');
     await user.click(screen.getByRole('button', { name: /إعادة المحاولة/ }));
-    expect(await screen.findByRole('button', { name: /اتفاقية سرية/ })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /اتفاقية سرية/ })).toBeInTheDocument();
   });
 
   it('اختيار نوع: النموذج بالافتراضيات، وحقل showWhen يظهر عند تبديل الاختيار', async () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     expect(screen.getByLabelText('اتجاه السرية')).toHaveValue('one_way');
     expect(screen.getByLabelText('أنا')).toHaveValue('discloser');
     expect(screen.queryByLabelText(/مهلة الرد/)).not.toBeInTheDocument();
@@ -141,7 +160,7 @@ describe('ContractDraftingScreen', () => {
     setAuthSession(SESSION);
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     expect(mockedGenerate).not.toHaveBeenCalled();
     expect(screen.getAllByText('هذا الحقل مطلوب.').length).toBe(2);
@@ -152,7 +171,7 @@ describe('ContractDraftingScreen', () => {
     mockedGenerate.mockResolvedValueOnce(RESULT);
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await user.selectOptions(screen.getByLabelText('أنا'), 'recipient');
     await fillMinimum(user);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
@@ -184,7 +203,7 @@ describe('ContractDraftingScreen', () => {
     });
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await fillMinimum(user);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     const status = await screen.findByRole('status');
@@ -199,7 +218,7 @@ describe('ContractDraftingScreen', () => {
     mockedGenerate.mockRejectedValueOnce(new DraftFieldError('بعض الإجابات تحتاج تصحيحاً', { start_date: 'تاريخ غير صالح' }));
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await fillMinimum(user);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     expect(await screen.findByText('تاريخ غير صالح')).toBeInTheDocument();
@@ -213,7 +232,7 @@ describe('ContractDraftingScreen', () => {
     mockedDownload.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new ApiError(503, 'تنزيل PDF غير متاح مؤقتاً'));
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await fillMinimum(user);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     await user.click(await screen.findByRole('button', { name: /تنزيل Word/ }));
@@ -230,7 +249,7 @@ describe('ContractDraftingScreen', () => {
     mockedGenerate.mockResolvedValueOnce(RESULT);
     const user = userEvent.setup();
     render(<ContractDraftingScreen />);
-    await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+    await pickType(user, /اتفاقية سرية/);
     await fillMinimum(user);
     await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
     await user.click(await screen.findByRole('button', { name: 'تعديل الإجابات' }));
@@ -252,7 +271,7 @@ describe('ContractDraftingScreen', () => {
     };
 
     async function openCustom(user: ReturnType<typeof userEvent.setup>) {
-      await user.click(await screen.findByRole('button', { name: /عقد آخر/ }));
+      await pickType(user, /عقد آخر/);
       await user.type(screen.getByRole('textbox', { name: 'نوع العقد' }), 'عقد توريد');
       await user.type(screen.getByLabelText('وصف الصفقة'), 'توريد معدات مكتبية على دفعات');
     }
@@ -311,7 +330,7 @@ describe('ContractDraftingScreen', () => {
       mockedGenerate.mockResolvedValueOnce(RESULT);
       const user = userEvent.setup();
       render(<ContractDraftingScreen />);
-      await user.click(await screen.findByRole('button', { name: /اتفاقية سرية/ }));
+      await pickType(user, /اتفاقية سرية/);
       await fillMinimum(user);
       await user.click(screen.getByRole('button', { name: 'جهّز المسودة' }));
       await screen.findByRole('heading', { name: 'اتفاقية سرية وعدم إفصاح' });
